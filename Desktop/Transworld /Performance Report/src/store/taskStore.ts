@@ -16,6 +16,7 @@ interface TaskStore {
   addMilestones: (newMilestones: Milestone[]) => void
   getMilestonesForTask: (taskId: string) => Milestone[]
   // generic
+  toggleTaskDone: (taskId: string) => void
   addTask: (task: Task) => void
   getTasksForUser: (userId: string) => Task[]
   getMeasurableTasks: () => Task[]
@@ -104,6 +105,21 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
 
   getMilestonesForTask: (taskId) =>
     get().milestones.filter((m) => m.task_id === taskId).sort((a, b) => a.sort_order - b.sort_order),
+
+  toggleTaskDone: (taskId) => {
+    set((state) => ({
+      tasks: state.tasks.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              status: t.status === 'done' ? 'in_progress' : 'done',
+              completed_at: t.status === 'done' ? null : new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }
+          : t,
+      ),
+    }))
+  },
 
   addTask: (task) => set((state) => ({ tasks: [task, ...state.tasks] })),
 

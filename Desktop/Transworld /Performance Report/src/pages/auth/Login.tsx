@@ -29,7 +29,7 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-950 via-brand-900 to-slate-900 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-slate-800 p-4">
       <div className="w-full max-w-sm animate-fade-in">
         {/* Card */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm">

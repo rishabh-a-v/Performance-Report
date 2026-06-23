@@ -1,7 +1,5 @@
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { KPICard } from '@/components/ui/KPICard'
-import { TrendLine } from '@/components/charts/TrendLine'
-import { WorkloadBar } from '@/components/charts/WorkloadBar'
 import { ScoreGauge } from '@/components/charts/ScoreGauge'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { useTaskStore } from '@/store/taskStore'
@@ -107,30 +105,6 @@ export function ExecutiveDashboard() {
     }
   }).sort((a, b) => b.snap.kpi_score - a.snap.kpi_score)
 
-  // Workload bar data
-  const workloadData = DEPT_SNAPSHOTS.map((snap) => {
-    const dept = DEPARTMENTS.find((d) => d.id === snap.department_id)
-    return {
-      name: dept?.name.slice(0, 5) ?? '?',
-      completed: snap.completed_tasks,
-      active: snap.active_tasks,
-      blocked: snap.blocked_tasks,
-    }
-  })
-
-  // Completion trend across depts
-  const completionTrendSeries = DEPARTMENTS.map((d) => ({
-    key: d.name.toLowerCase(),
-    color: DEPT_COLORS[d.id] ?? '#94a3b8',
-    label: d.name,
-  }))
-
-  // Revenue trend series
-  const revenueSeries = [
-    { key: 'invoiced',  color: '#5568f5', label: 'Invoiced' },
-    { key: 'collected', color: '#10b981', label: 'Collected' },
-  ]
-
   // Risk scores
   const riskFlags = [
     ...TASKS.filter((t) => t.status === 'blocked').map((t) => ({
@@ -174,30 +148,7 @@ export function ExecutiveDashboard() {
         <KPICard title="Risk Score"       value={riskFlags.filter((r) => r.severity === 'critical').length > 0 ? 'High' : 'Moderate'} icon={ShieldAlert} iconColor="text-amber-600" />
       </div>
 
-      {/* Charts row */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader><CardTitle>Completion Rate — All Departments</CardTitle></CardHeader>
-          <TrendLine
-            data={COMPLETION_TREND}
-            xKey="week"
-            series={completionTrendSeries}
-            yDomain={[50, 100]}
-            unit="%"
-          />
-        </Card>
-        <Card>
-          <CardHeader><CardTitle>Revenue Trend</CardTitle></CardHeader>
-          <TrendLine
-            data={REVENUE_TREND}
-            xKey="month"
-            series={revenueSeries}
-            yFormatter={(v) => v >= 10_000_000 ? `₹${(v / 10_000_000).toFixed(1)}Cr` : v >= 100_000 ? `₹${(v / 100_000).toFixed(0)}L` : `₹${(v / 1_000).toFixed(0)}K`}
-          />
-        </Card>
-      </div>
-
-      {/* Department rankings + workload */}
+      {/* Department rankings */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Rankings */}
         <Card padding={false}>
@@ -232,11 +183,6 @@ export function ExecutiveDashboard() {
           </div>
         </Card>
 
-        {/* Workload */}
-        <Card>
-          <CardHeader><CardTitle>Company-Wide Workload</CardTitle></CardHeader>
-          <WorkloadBar data={workloadData} />
-        </Card>
       </div>
 
       {/* Department Outcome Progress */}

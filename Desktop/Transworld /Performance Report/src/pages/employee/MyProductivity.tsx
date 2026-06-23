@@ -1,12 +1,10 @@
 import { useAuth } from '@/contexts/AuthContext'
-import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Card, CardTitle } from '@/components/ui/Card'
 import { KPICard } from '@/components/ui/KPICard'
-import { ScoreGauge } from '@/components/charts/ScoreGauge'
-import { TrendLine } from '@/components/charts/TrendLine'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { tasksByUser, PERF_SNAPSHOTS, PERSONAL_TREND, BLOCKERS } from '@/lib/mockData'
-import { completionRate, formatDate, formatRelative, hoursBlocked } from '@/lib/utils'
-import { CheckSquare, Clock, Zap, BarChart3, AlertTriangle } from 'lucide-react'
+import { tasksByUser, PERF_SNAPSHOTS, BLOCKERS } from '@/lib/mockData'
+import { completionRate, formatRelative, hoursBlocked } from '@/lib/utils'
+import { CheckSquare, Clock, BarChart3, AlertTriangle } from 'lucide-react'
 
 export function MyProductivity() {
   const { user } = useAuth()
@@ -36,31 +34,6 @@ export function MyProductivity() {
         <KPICard title="Completion Rate"      value={`${rate}%`}            icon={BarChart3}    delta={3.5} iconColor="text-blue-600" />
         <KPICard title="Avg Cycle Time"       value={avgCycle ? `${avgCycle}h` : '—'} icon={Clock} delta={-8} invertDelta iconColor="text-amber-600" />
         <KPICard title="Total Blocked Time"   value={`${totalBlockedHrs}h`} icon={AlertTriangle} iconColor="text-red-500" invertDelta />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Gauge */}
-        <Card className="flex flex-col items-center justify-center py-8">
-          <ScoreGauge score={kpiScore} label="Personal KPI" size="lg" />
-          <p className="mt-4 text-center text-xs text-slate-400 max-w-[160px]">
-            Based on completion rate, cycle time, and blocked time
-          </p>
-        </Card>
-
-        {/* Trend */}
-        <Card className="lg:col-span-2">
-          <CardHeader><CardTitle>6-Week Performance Trend</CardTitle></CardHeader>
-          <TrendLine
-            data={PERSONAL_TREND}
-            xKey="week"
-            series={[
-              { key: 'completed', color: '#10b981', label: 'Tasks Completed' },
-              { key: 'kpi',       color: '#5568f5', label: 'KPI Score' },
-              { key: 'blocked',   color: '#ef4444', label: 'Blocked Days' },
-            ]}
-            yDomain={[0, 100]}
-          />
-        </Card>
       </div>
 
       {/* Recent completed tasks */}

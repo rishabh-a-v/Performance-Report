@@ -36,7 +36,7 @@ export function AppShell() {
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-slate-900/40" onClick={() => setSidebarOpen(false)} />
-          <div className="relative z-50 h-full w-60 bg-white shadow-xl">
+          <div className="relative z-50 h-full w-60 bg-[#0f172a] shadow-xl">
             <Sidebar onClose={() => setSidebarOpen(false)} />
           </div>
         </div>

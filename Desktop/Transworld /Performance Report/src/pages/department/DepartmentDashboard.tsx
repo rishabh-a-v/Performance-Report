@@ -1,13 +1,9 @@
 import { useAuth } from '@/contexts/AuthContext'
-import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Card, CardTitle } from '@/components/ui/Card'
 import { KPICard } from '@/components/ui/KPICard'
 import { Avatar } from '@/components/ui/Avatar'
-import { ScoreGauge } from '@/components/charts/ScoreGauge'
-import { TrendLine } from '@/components/charts/TrendLine'
-import { WorkloadBar } from '@/components/charts/WorkloadBar'
-import { CompletionDonut } from '@/components/charts/CompletionDonut'
 import {
-  PROFILES, TASKS, DEPT_SNAPSHOTS, COMPLETION_TREND,
+  PROFILES, TASKS, DEPT_SNAPSHOTS,
   PERF_SNAPSHOTS, DEPARTMENTS, deptById, tasksByDept,
 } from '@/lib/mockData'
 import { useBlockerStore } from '@/store/blockerStore'
@@ -33,23 +29,6 @@ export function DepartmentDashboard() {
   const blocked  = tasks.filter((t) => t.status === 'blocked').length
   const backlog  = tasks.filter((t) => t.status === 'backlog' || t.status === 'ready').length
   const rate     = completionRate(done, tasks.length)
-
-  const barData = members.map((m) => {
-    const mt = tasks.filter((t) => t.assignee_id === m.id)
-    return {
-      name: m.full_name.split(' ')[0],
-      completed: mt.filter((t) => t.status === 'done').length,
-      active: mt.filter((t) => t.status === 'in_progress' || t.status === 'ready').length,
-      blocked: mt.filter((t) => t.status === 'blocked').length,
-    }
-  })
-
-  // Build trend data filtered to this dept
-  const deptKey = dept?.name.toLowerCase() as keyof typeof COMPLETION_TREND[0]
-  const trendData = COMPLETION_TREND.map((row) => ({
-    week: row.week,
-    'Completion %': typeof row[deptKey] === 'number' ? row[deptKey] : 0,
-  }))
 
   // Member performance
   const memberPerf = members.map((m) => {
@@ -80,45 +59,6 @@ export function DepartmentDashboard() {
         <KPICard title="Blocked Tasks"   value={blocked}          icon={AlertTriangle} iconColor="text-red-500" invertDelta />
         <KPICard title="Avg Cycle Time"  value={snap?.avg_cycle_time_hours ? `${snap.avg_cycle_time_hours}h` : '—'} icon={Clock} iconColor="text-amber-600" />
       </div>
-
-      {/* Charts row */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="flex flex-col items-center justify-center py-8">
-          <ScoreGauge score={snap?.kpi_score ?? 74} label={`${dept?.name} KPI`} size="lg" />
-          <div className="mt-4 grid w-full grid-cols-2 gap-3 text-center">
-            <div>
-              <p className="text-lg font-bold text-slate-800">{snap?.utilization_pct ?? 78}%</p>
-              <p className="text-xs text-slate-400">Utilisation</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold text-slate-800">{snap?.efficiency_score ?? 72}</p>
-              <p className="text-xs text-slate-400">Efficiency</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Task Distribution</CardTitle></CardHeader>
-          <CompletionDonut done={done} active={active} blocked={blocked} backlog={backlog} />
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Completion Trend</CardTitle></CardHeader>
-          <TrendLine
-            data={trendData}
-            xKey="week"
-            series={[{ key: 'Completion %', color: '#5568f5', label: 'Completion %' }]}
-            yDomain={[0, 100]}
-            unit="%"
-          />
-        </Card>
-      </div>
-
-      {/* Workload */}
-      <Card>
-        <CardHeader><CardTitle>Member Workload</CardTitle></CardHeader>
-        <WorkloadBar data={barData} />
-      </Card>
 
       {/* Bottleneck analysis */}
       {activeBlockers.length > 0 && (

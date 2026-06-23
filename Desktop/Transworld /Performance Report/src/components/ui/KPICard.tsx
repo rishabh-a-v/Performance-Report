@@ -17,27 +17,17 @@ export function KPICard({ title, value, subtitle, delta, icon: Icon, iconColor =
   const deltaLabel = delta != null ? `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%` : null
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-card">
+    <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4">
       <div className="flex items-start justify-between">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{title}</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{title}</p>
         {Icon && (
-          <span className={cn('rounded-lg bg-slate-50 p-2', iconColor)}>
-            <Icon size={16} />
+          <span className={cn('rounded bg-slate-50 p-1.5', iconColor)}>
+            <Icon size={14} />
           </span>
         )}
       </div>
-
-      <div>
-        <p className="text-2xl font-semibold text-slate-900">{value}</p>
-        {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
-      </div>
-
-      {deltaLabel && (
-        <div className={cn('flex items-center gap-1 text-xs font-medium', deltaPositive ? 'text-emerald-600' : 'text-red-500')}>
-          <span>{deltaPositive ? '↑' : '↓'}</span>
-          <span>{deltaLabel} vs last week</span>
-        </div>
-      )}
+      <p className="text-xl font-semibold text-[#0f172a]">{value}</p>
+      {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
     </div>
   )
 }

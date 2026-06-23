@@ -1,10 +1,8 @@
 import { useAuth } from '@/contexts/AuthContext'
-import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Card, CardTitle } from '@/components/ui/Card'
 import { KPICard } from '@/components/ui/KPICard'
 import { Avatar } from '@/components/ui/Avatar'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { ScoreGauge } from '@/components/charts/ScoreGauge'
-import { WorkloadBar } from '@/components/charts/WorkloadBar'
 import { reportees, tasksByUser, PERF_SNAPSHOTS, BLOCKERS } from '@/lib/mockData'
 import { completionRate, cn } from '@/lib/utils'
 import type { Profile } from '@/types/database'
@@ -51,13 +49,6 @@ export function TeamOverview() {
   const teamRate       = completionRate(totalCompleted, totalAssigned)
   const avgKpi         = rows.length ? Math.round(rows.reduce((s, r) => s + r.kpi, 0) / rows.length) : 0
 
-  const barData = rows.map((r) => ({
-    name: r.member.full_name.split(' ')[0],
-    completed: r.completed,
-    active: r.assigned - r.completed - r.blocked,
-    blocked: r.blocked,
-  }))
-
   return (
     <div className="space-y-6 animate-fade-in">
       {/* KPIs */}
@@ -66,20 +57,6 @@ export function TeamOverview() {
         <KPICard title="Completion Rate" value={`${teamRate}%`}  icon={TrendingUp}     delta={2.8} iconColor="text-emerald-600" />
         <KPICard title="Tasks Assigned"  value={totalAssigned}    icon={CheckSquare}    iconColor="text-slate-600" />
         <KPICard title="Members Blocked" value={totalBlocked}     icon={AlertTriangle}  iconColor="text-red-500" invertDelta />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Team KPI gauge */}
-        <Card className="flex flex-col items-center justify-center py-8">
-          <ScoreGauge score={avgKpi} label="Team KPI Score" size="lg" />
-          <p className="mt-3 text-center text-xs text-slate-400">Average across {rows.length} members</p>
-        </Card>
-
-        {/* Workload distribution */}
-        <Card className="lg:col-span-2">
-          <CardHeader><CardTitle>Workload Distribution</CardTitle></CardHeader>
-          <WorkloadBar data={barData} />
-        </Card>
       </div>
 
       {/* Member table */}

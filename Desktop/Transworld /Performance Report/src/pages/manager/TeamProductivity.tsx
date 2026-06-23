@@ -252,10 +252,11 @@ export function TeamProductivity() {
                     </td>
                     <td className="px-4 py-3 min-w-[140px]">
                       <ProgressBar value={pct} size="sm" className="mb-1" />
-                      <p className="text-xs text-slate-500 tabular-nums">
-                        {Math.round(pct)}%
-                        {!isMilestone(task) && <span> · {typeof remaining === 'number' ? formatQuantity(Math.max(0, remaining)) : remaining} left</span>}
-                      </p>
+                      {!isMilestone(task) && (
+                        <p className="text-xs text-slate-500 tabular-nums">
+                          {typeof remaining === 'number' ? formatQuantity(Math.max(0, remaining)) : remaining} left
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
                       {task.due_date

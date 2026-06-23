@@ -26,6 +26,29 @@ const STATUS_FILTERS: { label: string; value: TaskStatus | 'all' }[] = [
   { label: 'Done', value: 'done' },
 ]
 
+function DoneToggle({ taskId }: { taskId: string }) {
+  const toggleTaskDone = useTaskStore((s) => s.toggleTaskDone)
+  const done = useTaskStore((s) => s.tasks.find((t) => t.id === taskId)?.status === 'done')
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); toggleTaskDone(taskId) }}
+      title={done ? 'Mark as in progress' : 'Mark as done'}
+      className={cn(
+        'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all',
+        done
+          ? 'border-emerald-500 bg-emerald-500 text-white'
+          : 'border-slate-300 bg-white hover:border-emerald-400',
+      )}
+    >
+      {done && (
+        <svg viewBox="0 0 12 12" fill="none" className="h-3 w-3">
+          <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </button>
+  )
+}
+
 function MeasurableRow({ task, milestones, onUpdate }: { task: Task; milestones: Milestone[]; onUpdate: (t: Task) => void }) {
   const taskMs = milestones.filter((m) => m.task_id === task.id)
   const pct = progressPct(task, milestones)
@@ -38,8 +61,9 @@ function MeasurableRow({ task, milestones, onUpdate }: { task: Task; milestones:
         <td className="px-4 py-2.5">
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-1.5">
+              <DoneToggle taskId={task.id} />
               <BarChart2 size={12} className="shrink-0 text-brand-500" />
-              <span className="text-sm font-medium text-slate-900 group-hover:text-brand-700 transition-colors">{task.title}</span>
+              <span className={cn('text-sm font-medium transition-colors', task.status === 'done' ? 'text-slate-400 line-through' : 'text-slate-900 group-hover:text-brand-700')}>{task.title}</span>
               {isMilestone(task) && (
                 <span className="text-[10px] font-semibold uppercase tracking-wide bg-violet-100 text-violet-700 rounded px-1.5 py-0.5">Milestones</span>
               )}
@@ -75,7 +99,6 @@ function MeasurableRow({ task, milestones, onUpdate }: { task: Task; milestones:
                 <span className="text-xs font-semibold text-slate-800 tabular-nums whitespace-nowrap">
                   {progressSummary(task, milestones)}
                 </span>
-                <span className="text-xs font-bold text-brand-600">{pct}%</span>
                 {isMilestone(task) && taskMs.length > 0 && (
                   <span className="text-xs text-slate-400">
                     · {taskMs.filter((m) => m.completed).length}/{taskMs.length} done
@@ -111,7 +134,10 @@ function RegularRow({ task }: { task: Task }) {
     <tr className="group border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
       <td className="px-4 py-3">
         <div className="flex flex-col gap-0.5">
-          <span className="text-sm font-medium text-slate-900 group-hover:text-brand-700 transition-colors">{task.title}</span>
+          <div className="flex items-center gap-2">
+            <DoneToggle taskId={task.id} />
+            <span className={cn('text-sm font-medium transition-colors', task.status === 'done' ? 'text-slate-400 line-through' : 'text-slate-900 group-hover:text-brand-700')}>{task.title}</span>
+          </div>
           {task.description && <span className="text-xs text-slate-400 line-clamp-1">{task.description}</span>}
         </div>
       </td>

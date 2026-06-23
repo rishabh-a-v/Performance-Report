@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { KPICard } from '@/components/ui/KPICard'
 import { Badge } from '@/components/ui/Badge'
-import { TrendLine } from '@/components/charts/TrendLine'
-import { INVOICES, AUDITS, FINANCE_KPIS, REVENUE_TREND, profileById } from '@/lib/mockData'
+import { INVOICES, AUDITS, FINANCE_KPIS, profileById } from '@/lib/mockData'
 import { formatDate, formatRelative, currency, percent, statusColor, cn } from '@/lib/utils'
 import { DollarSign, FileText, CheckSquare, Clock, TrendingUp, AlertCircle } from 'lucide-react'
 
@@ -82,20 +81,6 @@ export function FinanceDashboard() {
               )
             })}
           </div>
-
-          {/* Revenue trend */}
-          <Card>
-            <CardHeader><CardTitle>Revenue Trend — 2026</CardTitle></CardHeader>
-            <TrendLine
-              data={REVENUE_TREND}
-              xKey="month"
-              series={[
-                { key: 'invoiced',  color: '#5568f5', label: 'Invoiced' },
-                { key: 'collected', color: '#10b981', label: 'Collected' },
-              ]}
-              yFormatter={(v) => v >= 10_000_000 ? `₹${(v / 10_000_000).toFixed(1)}Cr` : v >= 100_000 ? `₹${(v / 100_000).toFixed(0)}L` : `₹${(v / 1_000).toFixed(0)}K`}
-            />
-          </Card>
 
           {/* Invoice table */}
           <Card padding={false}>
