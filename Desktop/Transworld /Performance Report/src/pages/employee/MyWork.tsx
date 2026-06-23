@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { StatusBadge, PriorityBadge } from '@/components/ui/StatusBadge'
@@ -6,15 +6,18 @@ import { KPICard } from '@/components/ui/KPICard'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { TaskProgressDrawer } from '@/components/tasks/TaskProgressDrawer'
 import { TaskCreateModal } from '@/components/tasks/TaskCreateModal'
+import { ReportBlockerModal } from '@/components/tasks/ReportBlockerModal'
 import { useTaskStore } from '@/store/taskStore'
-import { formatDate, completionRate, cn } from '@/lib/utils'
+import { useBlockerStore } from '@/store/blockerStore'
+import { formatDate, completionRate, formatRelative, cn } from '@/lib/utils'
 import {
   calcForecast, forecastLabel, forecastBg, progressPct,
   formatQuantity, isMeasurable, progressSummary,
   isQuantity, isValue, isMilestone,
 } from '@/lib/kpiEngine'
+import { PROFILES } from '@/lib/mockData'
 import type { Task, TaskStatus, Milestone } from '@/types/database'
-import { CheckSquare, Clock, AlertTriangle, TrendingUp, Plus, BarChart2 } from 'lucide-react'
+import { CheckSquare, Clock, AlertTriangle, TrendingUp, Plus, BarChart2, ShieldAlert, CheckCircle2, UserX } from 'lucide-react'
 
 const STATUS_ORDER: TaskStatus[] = ['in_progress', 'blocked', 'ready', 'backlog', 'done']
 const STATUS_FILTERS: { label: string; value: TaskStatus | 'all' }[] = [
@@ -26,12 +29,19 @@ const STATUS_FILTERS: { label: string; value: TaskStatus | 'all' }[] = [
   { label: 'Done', value: 'done' },
 ]
 
-function DoneToggle({ taskId }: { taskId: string }) {
+function DoneToggle({ taskId, isDone }: { taskId: string; isDone: boolean }) {
+  const [done, setDone] = React.useState(isDone)
   const toggleTaskDone = useTaskStore((s) => s.toggleTaskDone)
-  const done = useTaskStore((s) => s.tasks.find((t) => t.id === taskId)?.status === 'done')
+
+  function handleClick(e: React.MouseEvent) {
+    e.stopPropagation()
+    setDone((d) => !d)
+    toggleTaskDone(taskId)
+  }
+
   return (
     <button
-      onClick={(e) => { e.stopPropagation(); toggleTaskDone(taskId) }}
+      onClick={handleClick}
       title={done ? 'Mark as in progress' : 'Mark as done'}
       className={cn(
         'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all',
@@ -49,7 +59,25 @@ function DoneToggle({ taskId }: { taskId: string }) {
   )
 }
 
-function MeasurableRow({ task, milestones, onUpdate }: { task: Task; milestones: Milestone[]; onUpdate: (t: Task) => void }) {
+function BlockedButton({ task, onReport }: { task: Task; onReport: (t: Task) => void }) {
+  if (task.status === 'done') return null
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onReport(task) }}
+      title="Report a blocker on this task"
+      className={cn(
+        'shrink-0 rounded border px-2 py-0.5 text-[10px] font-semibold transition-all',
+        task.status === 'blocked'
+          ? 'border-red-300 bg-red-50 text-red-600'
+          : 'border-slate-200 bg-white text-slate-400 hover:border-red-300 hover:text-red-500',
+      )}
+    >
+      {task.status === 'blocked' ? '⚠ Blocked' : 'Blocked?'}
+    </button>
+  )
+}
+
+function MeasurableRow({ task, milestones, onUpdate, onReport }: { task: Task; milestones: Milestone[]; onUpdate: (t: Task) => void; onReport: (t: Task) => void }) {
   const taskMs = milestones.filter((m) => m.task_id === task.id)
   const pct = progressPct(task, milestones)
   const forecast = calcForecast(task, milestones)
@@ -61,9 +89,10 @@ function MeasurableRow({ task, milestones, onUpdate }: { task: Task; milestones:
         <td className="px-4 py-2.5">
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-1.5">
-              <DoneToggle taskId={task.id} />
+              <DoneToggle taskId={task.id} isDone={task.status === 'done'} />
               <BarChart2 size={12} className="shrink-0 text-brand-500" />
-              <span className={cn('text-sm font-medium transition-colors', task.status === 'done' ? 'text-slate-400 line-through' : 'text-slate-900 group-hover:text-brand-700')}>{task.title}</span>
+              <span className={cn('text-sm font-medium transition-colors flex-1', task.status === 'done' ? 'text-slate-400 line-through' : 'text-slate-900 group-hover:text-brand-700')}>{task.title}</span>
+              <BlockedButton task={task} onReport={onReport} />
               {isMilestone(task) && (
                 <span className="text-[10px] font-semibold uppercase tracking-wide bg-violet-100 text-violet-700 rounded px-1.5 py-0.5">Milestones</span>
               )}
@@ -128,15 +157,16 @@ function MeasurableRow({ task, milestones, onUpdate }: { task: Task; milestones:
   )
 }
 
-function RegularRow({ task }: { task: Task }) {
+function RegularRow({ task, onReport }: { task: Task; onReport: (t: Task) => void }) {
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done'
   return (
     <tr className="group border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
       <td className="px-4 py-3">
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
-            <DoneToggle taskId={task.id} />
-            <span className={cn('text-sm font-medium transition-colors', task.status === 'done' ? 'text-slate-400 line-through' : 'text-slate-900 group-hover:text-brand-700')}>{task.title}</span>
+            <DoneToggle taskId={task.id} isDone={task.status === 'done'} />
+            <span className={cn('text-sm font-medium transition-colors flex-1', task.status === 'done' ? 'text-slate-400 line-through' : 'text-slate-900 group-hover:text-brand-700')}>{task.title}</span>
+            <BlockedButton task={task} onReport={onReport} />
           </div>
           {task.description && <span className="text-xs text-slate-400 line-clamp-1">{task.description}</span>}
         </div>
@@ -162,14 +192,19 @@ function RegularRow({ task }: { task: Task }) {
 
 export function MyWork() {
   const { user } = useAuth()
-  const { getTasksForUser, milestones } = useTaskStore()
+  const storeTasks = useTaskStore((s) => s.tasks)
+  const milestones = useTaskStore((s) => s.milestones)
+  const { blockers, resolveBlocker } = useBlockerStore()
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all')
   const [updateTask, setUpdateTask] = useState<Task | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [reportBlockerTask, setReportBlockerTask] = useState<Task | null>(null)
+  const [resolvingId, setResolvingId] = useState<string | null>(null)
+  const [resolveNotes, setResolveNotes] = useState('')
 
   if (!user) return null
 
-  const allTasks = getTasksForUser(user.id)
+  const allTasks = storeTasks.filter((t) => t.assignee_id === user.id)
   const filtered = statusFilter === 'all'
     ? [...allTasks].sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status))
     : allTasks.filter((t) => t.status === statusFilter)
@@ -179,6 +214,15 @@ export function MyWork() {
   const blocked = allTasks.filter((t) => t.status === 'blocked').length
   const overdue = allTasks.filter((t) => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done').length
   const rate    = completionRate(done, allTasks.length)
+
+  // Blockers this user is causing (they are the blocked_by_user_id)
+  const causingBlockers = blockers.filter((b) => b.blocked_by_user_id === user.id && !b.resolved_at)
+
+  function handleResolve(blockerId: string) {
+    resolveBlocker(blockerId, user.id, resolveNotes)
+    setResolvingId(null)
+    setResolveNotes('')
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -243,9 +287,9 @@ export function MyWork() {
               ) : (
                 filtered.map((task) =>
                   isMeasurable(task) ? (
-                    <MeasurableRow key={task.id} task={task} milestones={milestones} onUpdate={setUpdateTask} />
+                    <MeasurableRow key={task.id} task={task} milestones={milestones} onUpdate={setUpdateTask} onReport={setReportBlockerTask} />
                   ) : (
-                    <RegularRow key={task.id} task={task} />
+                    <RegularRow key={task.id} task={task} onReport={setReportBlockerTask} />
                   ),
                 )
               )}
@@ -263,6 +307,80 @@ export function MyWork() {
         </div>
       </Card>
 
+      {/* Blocks I'm Causing */}
+      {causingBlockers.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50/30">
+          <div className="mb-3 flex items-center gap-2">
+            <ShieldAlert size={15} className="text-orange-600" />
+            <CardTitle className="text-orange-800">You're Blocking Someone</CardTitle>
+            <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-bold text-orange-700">
+              {causingBlockers.length}
+            </span>
+          </div>
+          <div className="space-y-3">
+            {causingBlockers.map((b) => {
+              const blocked = PROFILES.find((p) => p.id === b.employee_id)
+              const blockedTask = storeTasks.find((t) => t.id === b.task_id)
+              return (
+                <div key={b.id} className="rounded-xl border border-orange-200 bg-white p-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <UserX size={13} className="text-orange-500 shrink-0" />
+                      <span className="text-sm font-semibold text-slate-900">
+                        {blocked?.full_name ?? 'Someone'} is blocked
+                      </span>
+                      <span className="text-xs text-slate-400">· {formatRelative(b.reported_at)}</span>
+                    </div>
+                    {blockedTask && (
+                      <p className="text-xs text-slate-500">
+                        Task: <span className="font-medium text-slate-700">{blockedTask.title}</span>
+                      </p>
+                    )}
+                    <p className="text-sm text-slate-700 leading-relaxed">{b.description}</p>
+                  </div>
+
+                  <div className="shrink-0">
+                    {resolvingId === b.id ? (
+                      <div className="flex flex-col gap-2 w-56">
+                        <textarea
+                          value={resolveNotes}
+                          onChange={(e) => setResolveNotes(e.target.value)}
+                          placeholder="Resolution notes (optional)…"
+                          rows={2}
+                          className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 focus:outline-none focus:border-brand-400"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleResolve(b.id)}
+                            className="flex-1 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                          >
+                            Confirm Resolved
+                          </button>
+                          <button
+                            onClick={() => { setResolvingId(null); setResolveNotes('') }}
+                            className="rounded-full border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setResolvingId(b.id)}
+                        className="flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                      >
+                        <CheckCircle2 size={13} />
+                        Mark Resolved
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      )}
+
       {/* Drawers / Modals */}
       {updateTask && (
         <TaskProgressDrawer task={updateTask} onClose={() => setUpdateTask(null)} />
@@ -272,6 +390,13 @@ export function MyWork() {
           currentUserId={user.id}
           defaultDeptId={user.department_id}
           onClose={() => setShowCreate(false)}
+        />
+      )}
+      {reportBlockerTask && (
+        <ReportBlockerModal
+          task={reportBlockerTask}
+          reporterId={user.id}
+          onClose={() => setReportBlockerTask(null)}
         />
       )}
     </div>
