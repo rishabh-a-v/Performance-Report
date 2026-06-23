@@ -9,7 +9,7 @@ import { TaskCreateModal } from '@/components/tasks/TaskCreateModal'
 import { useTaskStore } from '@/store/taskStore'
 import { PROFILES, DEPARTMENTS, reportees } from '@/lib/mockData'
 import {
-  calcForecast, forecastBg, progressPct,
+  calcForecast, progressPct,
   formatQuantity, isMeasurable, progressSummary, isMilestone, isValue,
 } from '@/lib/kpiEngine'
 import { cn } from '@/lib/utils'
@@ -23,7 +23,7 @@ import {
   ResponsiveContainer, Legend,
 } from 'recharts'
 
-type SortKey = 'pct' | 'remaining' | 'throughput' | 'due'
+type SortKey = 'pct' | 'remaining' | 'due'
 type SortDir = 'asc' | 'desc'
 
 const CHART_COLORS = ['#5568f5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899']
@@ -79,7 +79,6 @@ export function TeamProductivity() {
       let diff = 0
       if (sortKey === 'pct')        diff = a.pct - b.pct
       if (sortKey === 'remaining')  diff = a.remaining - b.remaining
-      if (sortKey === 'throughput') diff = a.throughput - b.throughput
       if (sortKey === 'due')        diff = a.dueMs - b.dueMs
       return sortDir === 'asc' ? diff : -diff
     })
@@ -214,28 +213,25 @@ export function TeamProductivity() {
               <tr className="bg-slate-50/80 border-b border-slate-100">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Assignee</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Task</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Summary</th>
                 <th className="px-4 py-3 text-left">
                   <SortButton k="pct" label="Progress" />
                 </th>
                 <th className="px-4 py-3 text-left">
-                  <SortButton k="throughput" label="Throughput" />
-                </th>
-                <th className="px-4 py-3 text-left">
                   <SortButton k="due" label="Due" />
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Forecast</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-sm text-slate-400">
+                  <td colSpan={6} className="py-12 text-center text-sm text-slate-400">
                     No measurable tasks for this filter.
                   </td>
                 </tr>
               ) : (
-                sorted.map(({ task, pct, forecast, assignee, throughput, remaining }) => (
+                sorted.map(({ task, pct, forecast, assignee, remaining }) => (
                   <tr key={task.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                     <td className="px-4 py-3">
                       {assignee ? (
@@ -250,42 +246,22 @@ export function TeamProductivity() {
                     </td>
                     <td className="px-4 py-3 max-w-[180px]">
                       <p className="text-sm font-medium text-slate-900 line-clamp-1">{task.title}</p>
-                      <p className="text-xs text-slate-400 tabular-nums">
-                        {progressSummary(task, milestones)}
-                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-400 tabular-nums whitespace-nowrap">
+                      {progressSummary(task, milestones)}
                     </td>
                     <td className="px-4 py-3 min-w-[140px]">
                       <ProgressBar value={pct} size="sm" className="mb-1" />
                       <p className="text-xs text-slate-500 tabular-nums">
                         {Math.round(pct)}%
-                        {!isMilestone(task) && <span> · {isMilestone(task) ? `${remaining} ms left` : `${typeof remaining === 'number' ? formatQuantity(Math.max(0, remaining)) : remaining} left`}</span>}
+                        {!isMilestone(task) && <span> · {typeof remaining === 'number' ? formatQuantity(Math.max(0, remaining)) : remaining} left</span>}
                       </p>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-700 tabular-nums whitespace-nowrap">
-                      {throughput > 0 && !isMilestone(task)
-                        ? <><span className="font-semibold">{throughput}</span> {task.unit ?? ''}/day</>
-                        : isMilestone(task)
-                          ? <span className="text-slate-400">—</span>
-                          : <span className="text-slate-300">—</span>
-                      }
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
                       {task.due_date
                         ? new Date(task.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
                         : '—'
                       }
-                    </td>
-                    <td className="px-4 py-3">
-                      {forecast ? (
-                        <span className={cn('rounded-lg px-2.5 py-1 text-xs font-medium whitespace-nowrap', forecastBg(forecast))}>
-                          {forecast.isOnTrack
-                            ? `On Track · ${Math.ceil(forecast.daysToComplete)}d`
-                            : forecast.isAtRisk
-                            ? `At Risk · ${Math.ceil(forecast.daysToComplete)}d`
-                            : `Behind · ${Math.ceil(forecast.daysToComplete)}d`
-                          }
-                        </span>
-                      ) : <span className="text-xs text-slate-300">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       <button
