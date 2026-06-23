@@ -18,6 +18,7 @@ interface TaskStore {
   // generic
   toggleTaskDone: (taskId: string) => void
   addTask: (task: Task) => void
+  updateTask: (taskId: string, updates: Partial<Task>) => void
   getTasksForUser: (userId: string) => Task[]
   getMeasurableTasks: () => Task[]
   getHistoryForTask: (taskId: string) => TaskProgressHistory[]
@@ -122,6 +123,16 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   addTask: (task) => set((state) => ({ tasks: [task, ...state.tasks] })),
+
+  updateTask: (taskId, updates) => {
+    set((state) => ({
+      tasks: state.tasks.map((t) =>
+        t.id === taskId
+          ? { ...t, ...updates, updated_at: new Date().toISOString() }
+          : t,
+      ),
+    }))
+  },
 
   getTasksForUser: (userId) => get().tasks.filter((t) => t.assignee_id === userId),
 

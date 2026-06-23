@@ -4,14 +4,14 @@
 
 @layer base {
   :root {
-    /* Logistics Precision System – Corporate Blue #2563EB, Deep Navy #0F172A */
-    --background: 0 0% 100%;
+    /* Minimalist Light-Mode Theme (WeCraft Style) */
+    --background: 210 20% 97.5%; /* Soft slate gray-blue: #f8f9fa */
     --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
+    --card: 0 0% 100%; /* Pure white cards */
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 221 83% 53%;
+    --primary: 221 83% 53%; /* Classic bright blue accent */
     --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222 47% 11%;
@@ -21,10 +21,10 @@
     --accent-foreground: 222 47% 11%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
+    --border: 214 32% 91%; /* Soft light border */
     --input: 214 32% 91%;
     --ring: 221 83% 53%;
-    --radius: 0.25rem;
+    --radius: 0.625rem; /* Larger, premium card roundedness */
   }
 
   *, *::before, *::after {

@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext'
-import { Card, CardTitle } from '@/components/ui/Card'
+import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { KPICard } from '@/components/ui/KPICard'
 import { Avatar } from '@/components/ui/Avatar'
 import {

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
 import { DEMO_CREDENTIALS } from '@/lib/mockData'
 import { LayoutDashboard } from 'lucide-react'
 
@@ -29,51 +28,51 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-slate-800 p-4">
-      <div className="w-full max-w-sm animate-fade-in">
-        {/* Card */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm">
-          {/* Logo */}
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 text-slate-700">
+      <div className="w-full max-w-sm animate-slide-in">
+        {/* Card Container */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-8 shadow-xl">
+          {/* Logo Section */}
           <div className="mb-8 flex flex-col items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-500/20 text-brand-400 ring-1 ring-brand-500/30">
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
               <LayoutDashboard size={24} />
             </span>
             <div className="text-center">
-              <h1 className="text-xl font-semibold text-white">Transworld MI</h1>
-              <p className="mt-1 text-sm text-slate-400">Management Intelligence Platform</p>
+              <h1 className="text-lg font-bold text-slate-800 tracking-tight">Transworld</h1>
+              <p className="mt-1 text-xs text-slate-400 font-medium">Management Intelligence Platform</p>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-300">Work Email</label>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-500 uppercase tracking-wider">Work Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@transworld.com"
                 required
-                className="w-full rounded-lg border border-white/10 bg-white/10 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-300"
               />
-              {error && <p className="mt-1.5 text-xs text-red-400">{error}</p>}
+              {error && <p className="mt-1.5 text-xs text-red-600 font-medium">{error}</p>}
             </div>
-            <Button type="submit" loading={loading} className="w-full" size="lg">
+            <Button type="submit" loading={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg" size="lg">
               Sign in
             </Button>
           </form>
 
-          {/* Demo logins */}
-          <div className="mt-6">
-            <p className="mb-3 text-center text-xs font-medium text-slate-500">— Demo accounts —</p>
+          {/* Quick Logins for Demo */}
+          <div className="mt-8 border-t border-slate-100 pt-5">
+            <p className="mb-3 text-center text-[10px] font-bold uppercase tracking-wider text-slate-400">— Demo accounts —</p>
             <div className="space-y-1.5">
               {Object.entries(DEMO_CREDENTIALS).map(([e, label]) => (
                 <button
                   key={e}
                   onClick={() => quickLogin(e)}
-                  className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition-colors hover:bg-white/10"
+                  className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-slate-50 transition-colors group"
                 >
-                  <span className="text-xs font-medium text-white">{label}</span>
-                  <span className="text-[10px] text-slate-500 truncate ml-2">{e}</span>
+                  <span className="text-xs font-semibold text-slate-700 group-hover:text-blue-600">{label}</span>
+                  <span className="text-[10px] text-slate-400 truncate ml-2">{e}</span>
                 </button>
               ))}
             </div>

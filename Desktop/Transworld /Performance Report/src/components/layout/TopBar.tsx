@@ -1,7 +1,6 @@
-import { Bell, Search, Menu } from 'lucide-react'
+import { Bell, Search, Menu, HelpCircle } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Avatar } from '@/components/ui/Avatar'
-import { formatDate } from '@/lib/utils'
 
 interface TopBarProps {
   title: string
@@ -9,45 +8,56 @@ interface TopBarProps {
   onMenuClick?: () => void
 }
 
-export function TopBar({ title, subtitle, onMenuClick }: TopBarProps) {
+export function TopBar({ title, onMenuClick }: TopBarProps) {
   const { user } = useAuth()
   if (!user) return null
 
+  // Format breadcrumbs based on active page title
+  const getBreadcrumbs = () => {
+    if (title === 'My Work') {
+      return (
+        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+          <span className="font-semibold text-slate-500">Transworld</span>
+          <span>/</span>
+          <span className="flex items-center gap-1 font-medium text-slate-700">
+            <span className="text-[10px]">㗊</span> WeCraft
+          </span>
+        </div>
+      )
+    }
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-slate-400">
+        <span className="font-semibold text-slate-500">Transworld</span>
+        <span>/</span>
+        <span className="flex items-center gap-1 text-slate-500">
+          <span className="text-[10px]">㗊</span> WeCraft
+        </span>
+        <span>/</span>
+        <span className="font-medium text-slate-700">{title}</span>
+      </div>
+    )
+  }
+
   return (
-    <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-5 shrink-0 gap-4">
+    <header className="flex h-11 items-center justify-between bg-transparent px-5 pt-3 shrink-0 gap-4">
+      {/* Left side: Mobile menu trigger + Breadcrumbs */}
       <div className="flex items-center gap-3 shrink-0">
         <button
           onClick={onMenuClick}
-          className="rounded p-1.5 text-slate-400 hover:bg-slate-100 lg:hidden"
+          className="rounded p-1 text-slate-400 hover:bg-slate-200/50 lg:hidden"
         >
-          <Menu size={18} />
+          <Menu size={16} />
         </button>
-        <div>
-          <h1 className="text-sm font-semibold text-[#0f172a]">{title}</h1>
-          {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
-        </div>
+        {getBreadcrumbs()}
       </div>
 
-      {/* Global search */}
-      <div className="relative hidden max-w-xs flex-1 sm:block">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-        <input
-          type="search"
-          placeholder="Search shipments, tasks…"
-          className="h-8 w-full rounded border border-slate-200 bg-slate-50 pl-8 pr-3 text-xs text-slate-700 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/10"
-        />
-      </div>
-
-      <div className="flex items-center gap-2 shrink-0">
-        <span className="hidden text-xs text-slate-400 lg:block">{formatDate(new Date())}</span>
-        <button className="rounded p-2 text-slate-400 hover:bg-slate-100 transition-colors sm:hidden">
-          <Search size={16} />
+      {/* Right side: Bell icon and user avatar */}
+      <div className="flex items-center gap-3 shrink-0">
+        <button className="relative rounded p-1 text-slate-400 hover:bg-slate-200/50 hover:text-slate-600 transition-colors">
+          <Bell size={15} />
+          <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-red-500" />
         </button>
-        <button className="relative rounded p-2 text-slate-400 hover:bg-slate-100 transition-colors">
-          <Bell size={16} />
-          <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-red-500" />
-        </button>
-        <Avatar name={user.full_name} size="sm" />
+        <Avatar name={user.full_name} size="xs" className="ring-1 ring-slate-200" />
       </div>
     </header>
   )

@@ -3,18 +3,13 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Input'
-import { Avatar } from '@/components/ui/Avatar'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/Select'
-import { useBlockerStore } from '@/store/blockerStore'
 import { useTaskStore } from '@/store/taskStore'
-import { DAILY_CHECKINS, PROFILES } from '@/lib/mockData'
-import { formatDate, formatDateTime, cn } from '@/lib/utils'
+import { DAILY_CHECKINS } from '@/lib/mockData'
+import { formatDate, formatDateTime } from '@/lib/utils'
 import {
-  CheckCircle2, AlertCircle, Activity, Smile, Meh, Frown, SmilePlus, SmilePlus as SmileDown,
-  ClipboardCheck, Target, ShieldAlert, Link2, HeartPulse, UserX,
+  CheckCircle2, Activity, SmilePlus, Smile, Meh, Frown, SmilePlus as SmileDown,
+  ClipboardCheck, Target, Link2
 } from 'lucide-react'
 
 const MOOD_OPTIONS = [
@@ -27,15 +22,11 @@ const MOOD_OPTIONS = [
 
 export function DailyPulse() {
   const { user } = useAuth()
-  const { addBlocker } = useBlockerStore()
   const { getTasksForUser } = useTaskStore()
 
   const [completed, setCompleted]           = useState('')
   const [focus, setFocus]                   = useState('')
-  const [isBlocked, setIsBlocked]           = useState<boolean | null>(null)
-  const [blockerDesc, setBlockerDesc]       = useState('')
-  const [blockedByUserId, setBlockedByUser] = useState('')
-  const [mood, setMood]                     = useState<number | null>(null)
+  const [mood]                              = useState<number | null>(null)
   const [selectedTasks, setSelectedTasks]   = useState<string[]>([])
   const [submitted, setSubmitted]           = useState(false)
   const [submitting, setSubmitting]         = useState(false)
@@ -46,12 +37,6 @@ export function DailyPulse() {
   const todayCheckin = DAILY_CHECKINS.find((c) => c.user_id === user.id && c.checkin_date === today)
   const myTasks      = getTasksForUser(user.id).filter((t) => t.status !== 'done')
 
-  const otherUsers = PROFILES
-    .filter((p) => p.id !== user.id && p.is_active)
-    .sort((a, b) => a.full_name.localeCompare(b.full_name))
-
-  const blockedByProfile = PROFILES.find((p) => p.id === blockedByUserId)
-
   function toggleTask(id: string) {
     setSelectedTasks((prev) =>
       prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id],
@@ -60,24 +45,9 @@ export function DailyPulse() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!completed.trim() || !focus.trim() || isBlocked === null) return
+    if (!completed.trim() || !focus.trim()) return
     setSubmitting(true)
     await new Promise((r) => setTimeout(r, 600))
-
-    if (isBlocked && blockerDesc.trim() && user) {
-      addBlocker({
-        employee_id: user.id,
-        task_id: selectedTasks[0] ?? null,
-        description: blockerDesc.trim(),
-        blocked_by_user_id: blockedByUserId || null,
-        reported_at: new Date().toISOString(),
-        resolved_at: null,
-        resolved_by: null,
-        resolution_notes: null,
-        hours_blocked: 0,
-      })
-    }
-
     setSubmitting(false)
     setSubmitted(true)
   }
@@ -87,15 +57,13 @@ export function DailyPulse() {
     const checkin = todayCheckin ?? {
       completed_yesterday: completed,
       focus_today: focus,
-      is_blocked: isBlocked ?? false,
-      blocker_description: blockerDesc || null,
       mood_score: mood,
       created_at: new Date().toISOString(),
     }
-    const MoodIcon = MOOD_OPTIONS.find((m) => m.score === checkin.mood_score)?.icon
 
     return (
-      <div className="space-y-6 animate-fade-in">
+      <div className="space-y-6 animate-fade-in w-full">
+        {/* Submission success */}
         <Card>
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
@@ -108,6 +76,7 @@ export function DailyPulse() {
           </div>
         </Card>
 
+        {/* Content details side-by-side */}
         <div className="grid gap-4 sm:grid-cols-2">
           <Card>
             <CardHeader><CardTitle>Completed Yesterday</CardTitle></CardHeader>
@@ -118,53 +87,16 @@ export function DailyPulse() {
             <p className="text-sm text-muted-foreground leading-relaxed">{checkin.focus_today}</p>
           </Card>
         </div>
-
-        <Card>
-          <div className="flex items-start gap-3">
-            {checkin.is_blocked ? (
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
-                <AlertCircle size={16} />
-              </span>
-            ) : (
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                <CheckCircle2 size={16} />
-              </span>
-            )}
-            <div className="flex-1">
-              <p className="font-medium">
-                {checkin.is_blocked ? 'Blocked' : 'Not Blocked'}
-              </p>
-              {checkin.blocker_description && (
-                <p className="mt-1 text-sm text-muted-foreground">{checkin.blocker_description}</p>
-              )}
-              {submitted && isBlocked && blockedByProfile && (
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Blocked by:</span>
-                  <Avatar name={blockedByProfile.full_name} size="xs" />
-                  <span className="text-xs font-semibold text-red-700">{blockedByProfile.full_name}</span>
-                  <span className="text-xs text-muted-foreground">· {blockedByProfile.designation}</span>
-                </div>
-              )}
-            </div>
-            {MoodIcon && (
-              <MoodIcon size={22} className="ml-auto text-muted-foreground" />
-            )}
-          </div>
-        </Card>
       </div>
     )
   }
 
-  const isValid =
-    completed.trim() &&
-    focus.trim() &&
-    isBlocked !== null &&
-    (!isBlocked || blockerDesc.trim())
+  const isValid = completed.trim() && focus.trim()
 
   // ── Form ──────────────────────────────────────────────────────────────────
   return (
-    <div className="animate-fade-in">
-      <form onSubmit={handleSubmit} className="space-y-5 max-w-2xl">
+    <div className="animate-fade-in w-full">
+      <form onSubmit={handleSubmit} className="space-y-5 w-full">
         {/* Header */}
         <Card>
           <div className="flex items-center gap-3">
@@ -206,89 +138,6 @@ export function DailyPulse() {
           />
         </Card>
 
-        {/* Blocker */}
-        <Card>
-          <label className="mb-3 flex items-center gap-2 text-sm font-semibold">
-            <ShieldAlert size={14} className="text-muted-foreground" />
-            Are you blocked on anything?
-          </label>
-          <div className="flex gap-3">
-            {[
-              { v: false, label: 'No, all clear' },
-              { v: true,  label: 'Yes, I am blocked' },
-            ].map(({ v, label }) => (
-              <button
-                key={String(v)}
-                type="button"
-                onClick={() => setIsBlocked(v)}
-                className={cn(
-                  'flex-1 rounded-lg border-2 py-3 text-sm font-medium transition-all',
-                  isBlocked === v
-                    ? v
-                      ? 'border-destructive bg-destructive/5 text-destructive'
-                      : 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                    : 'border-input text-muted-foreground hover:border-border',
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {isBlocked === true && (
-            <div className="mt-4 space-y-3">
-              {/* Who is blocking you */}
-              <div>
-                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Who is blocking you? (optional)
-                </p>
-                <Select value={blockedByUserId} onValueChange={setBlockedByUser}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="No specific person — general blocker" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {otherUsers.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.full_name}{p.designation ? ` · ${p.designation}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {blockedByProfile && (
-                  <div className="mt-2 flex items-center gap-3 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2">
-                    <Avatar name={blockedByProfile.full_name} size="sm" />
-                    <div>
-                      <p className="text-xs font-semibold text-destructive">{blockedByProfile.full_name}</p>
-                      <p className="text-[10px] text-destructive/70">{blockedByProfile.designation}</p>
-                    </div>
-                    <span className="ml-auto rounded-full border border-destructive/20 bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
-                      Blocking you
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Blocker description */}
-              <div>
-                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Describe the blocker *
-                </p>
-                <Textarea
-                  value={blockerDesc}
-                  onChange={(e) => setBlockerDesc(e.target.value)}
-                  placeholder={
-                    blockedByProfile
-                      ? `e.g. Waiting on ${blockedByProfile.full_name.split(' ')[0]} to share the API spec…`
-                      : 'Describe what is blocking you and how it impacts your work…'
-                  }
-                  rows={3}
-                />
-              </div>
-            </div>
-          )}
-        </Card>
-
         {/* Related tasks */}
         {myTasks.length > 0 && (
           <Card>
@@ -312,8 +161,6 @@ export function DailyPulse() {
             </div>
           </Card>
         )}
-
-
 
         <Button
           type="submit"
