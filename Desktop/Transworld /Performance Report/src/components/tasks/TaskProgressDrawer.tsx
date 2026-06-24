@@ -2,13 +2,15 @@ import { useState } from 'react'
 import {
   X, Calendar, CheckSquare, Paperclip, MessageSquare, Plus,
   ChevronsUpDown, Trash2, CheckCircle2, ChevronRight, ChevronDown, Flag,
-  Clock, Download
+  Clock, Download, SendHorizonal,
 } from 'lucide-react'
 import { useTaskStore } from '@/store/taskStore'
+import { useChangeRequestStore } from '@/store/changeRequestStore'
 import { useAuth } from '@/contexts/AuthContext'
 import { Avatar } from '@/components/ui/Avatar'
 import { cn, formatDate } from '@/lib/utils'
 import { PROFILES } from '@/lib/mockData'
+import { STATUS_LABELS } from '@/components/ui/StatusBadge'
 import type { Task, Milestone, TaskPriority, TaskStatus } from '@/types/database'
 
 interface Props {
@@ -17,7 +19,8 @@ interface Props {
 }
 
 export function TaskProgressDrawer({ task, onClose }: Props) {
-  const { updateTask, toggleMilestone, addMilestones, milestones: allMilestones } = useTaskStore()
+  const { updateTask, toggleMilestone, deleteMilestone, addMilestones, milestones: allMilestones } = useTaskStore()
+  const { addRequest, requests } = useChangeRequestStore()
   const { user } = useAuth()
 
   // Get milestones/subtasks for this task
@@ -31,6 +34,35 @@ export function TaskProgressDrawer({ task, onClose }: Props) {
   const [subtasksOpen, setSubtasksOpen] = useState(true)
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('')
   const [showAddSubtask, setShowAddSubtask] = useState(false)
+  const [isAddingTag, setIsAddingTag] = useState(false)
+  const [newTagInput, setNewTagInput] = useState('')
+
+  // Date change request state
+  const [showDateRequest, setShowDateRequest] = useState(false)
+  const [requestedDate, setRequestedDate] = useState('')
+  const [requestReason, setRequestReason] = useState('')
+  const [dateRequestSent, setDateRequestSent] = useState(false)
+
+  const pendingDateRequest = requests.find(
+    (r) => r.task_id === task.id && r.status === 'pending'
+  )
+
+  function handleSubmitDateRequest() {
+    if (!requestedDate || !requestReason.trim() || !user) return
+    addRequest({
+      task_id: task.id,
+      task_title: task.title,
+      requested_by_id: user.id,
+      requested_by_name: user.full_name,
+      current_date: task.due_date ?? null,
+      requested_date: requestedDate,
+      reason: requestReason.trim(),
+    })
+    setShowDateRequest(false)
+    setRequestedDate('')
+    setRequestReason('')
+    setDateRequestSent(true)
+  }
 
   // Mock comments
   const [comments, setComments] = useState<{ id: string; author: string; avatar: string; text: string; date: string }[]>([
@@ -133,17 +165,12 @@ export function TaskProgressDrawer({ task, onClose }: Props) {
 
       {/* Main Modal Container */}
       <div className="relative flex w-full max-w-4xl h-[85vh] flex-col rounded-2xl bg-white shadow-2xl overflow-hidden border border-slate-200 animate-slide-in">
-        {/* Header Breadcrumb */}
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-3">
           <div className="flex items-center gap-2 text-[11px] text-slate-400">
-            <span>Your Projects</span>
+            <span>Transworld</span>
             <span>/</span>
-            <span className="flex items-center gap-0.5">
-              <span className="text-[10px]">㗊</span> WeCraft
-            </span>
-            <span>/</span>
-            <span className="font-semibold text-slate-600 capitalize">
-              {task.status.replace('_', ' ')}
+            <span className="font-semibold text-slate-600">
+              {STATUS_LABELS[task.status] ?? task.status}
             </span>
           </div>
           <button
@@ -158,23 +185,8 @@ export function TaskProgressDrawer({ task, onClose }: Props) {
         <div className="flex flex-1 overflow-hidden min-h-0">
           {/* Left Column (Main Details - 65%) */}
           <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
-            {/* Title with checkbox */}
-            <div className="flex items-start gap-3">
-              <button
-                onClick={handleToggleTaskComplete}
-                className={cn(
-                  'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all mt-1',
-                  task.status === 'done'
-                    ? 'border-emerald-500 bg-emerald-500 text-white'
-                    : 'border-slate-300 bg-white hover:border-emerald-400',
-                )}
-              >
-                {task.status === 'done' && (
-                  <svg viewBox="0 0 12 12" fill="none" className="h-3.5 w-3.5">
-                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </button>
+            {/* Title */}
+            <div className="flex items-start">
               <input
                 type="text"
                 value={title}
@@ -263,7 +275,7 @@ export function TaskProgressDrawer({ task, onClose }: Props) {
                       </div>
                       {/* Subtask actions (delete) */}
                       <button
-                        onClick={() => toggleMilestone(ms.id)}
+                        onClick={() => deleteMilestone(ms.id)}
                         className="opacity-0 group-hover:opacity-100 rounded p-1 text-slate-400 hover:text-red-500 transition-all"
                       >
                         <Trash2 size={12} />
@@ -400,43 +412,108 @@ export function TaskProgressDrawer({ task, onClose }: Props) {
             <div className="space-y-1.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Created by</span>
               <div className="flex items-center gap-2">
-                <Avatar name="Michele Jordan" size="sm" className="ring-1 ring-slate-200" />
-                <span className="text-xs font-semibold text-slate-700">Michele Jordan</span>
+                {(() => {
+                  const creator = PROFILES.find((p) => p.id === task.created_by)
+                  const name = creator?.full_name ?? 'Unknown'
+                  return (
+                    <>
+                      <Avatar name={name} size="sm" className="ring-1 ring-slate-200" />
+                      <span className="text-xs font-semibold text-slate-700">{name}</span>
+                    </>
+                  )
+                })()}
               </div>
             </div>
 
             {/* Assignee */}
             <div className="space-y-1.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Assignee</span>
-              <div className="relative">
-                <select
-                  value={task.assignee_id}
-                  onChange={(e) => updateTask(task.id, { assignee_id: e.target.value })}
-                  className="w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-slate-300 cursor-pointer"
-                >
-                  {PROFILES.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.full_name} ({p.designation})
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  <ChevronsUpDown size={11} />
-                </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <span className="text-xs font-semibold text-slate-700">
+                  {PROFILES.find((p) => p.id === task.assignee_id)?.full_name ?? 'Unassigned'}
+                  {PROFILES.find((p) => p.id === task.assignee_id)?.designation && (
+                    <span className="ml-1 font-normal text-slate-400">
+                      ({PROFILES.find((p) => p.id === task.assignee_id)?.designation})
+                    </span>
+                  )}
+                </span>
               </div>
             </div>
 
-            {/* Due Date */}
+            {/* Due Date — requires manager approval to change */}
             <div className="space-y-1.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Due Date</span>
-              <div className="relative">
-                <input
-                  type="date"
-                  value={task.due_date ? task.due_date.slice(0, 10) : ''}
-                  onChange={(e) => updateTask(task.id, { due_date: e.target.value })}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-slate-300 cursor-pointer"
-                />
+
+              {/* Current date display */}
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <Calendar size={12} className="text-slate-400" />
+                  <span className="text-xs font-semibold text-slate-700">
+                    {task.due_date ? formatDate(task.due_date) : '—'}
+                  </span>
+                </div>
+                {!pendingDateRequest && !showDateRequest && (
+                  <button
+                    onClick={() => { setShowDateRequest(true); setDateRequestSent(false) }}
+                    className="text-[10px] font-semibold text-brand-600 hover:text-brand-700"
+                  >
+                    Request change
+                  </button>
+                )}
               </div>
+
+              {/* Pending request badge */}
+              {pendingDateRequest && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 space-y-0.5">
+                  <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Pending approval</p>
+                  <p className="text-xs text-amber-800">
+                    Requested: <strong>{formatDate(pendingDateRequest.requested_date)}</strong>
+                  </p>
+                  <p className="text-[10px] text-amber-600 italic line-clamp-2">"{pendingDateRequest.reason}"</p>
+                </div>
+              )}
+
+              {/* Sent confirmation */}
+              {dateRequestSent && !pendingDateRequest && (
+                <p className="text-[10px] text-emerald-600 font-semibold">✓ Request sent for approval</p>
+              )}
+
+              {/* Request form */}
+              {showDateRequest && (
+                <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">New due date</p>
+                  <input
+                    type="date"
+                    value={requestedDate}
+                    onChange={(e) => setRequestedDate(e.target.value)}
+                    min={new Date().toISOString().slice(0, 10)}
+                    className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-brand-400"
+                  />
+                  <textarea
+                    value={requestReason}
+                    onChange={(e) => setRequestReason(e.target.value)}
+                    placeholder="Reason for the change…"
+                    rows={2}
+                    className="w-full resize-none rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:border-brand-400"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSubmitDateRequest}
+                      disabled={!requestedDate || !requestReason.trim()}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-brand-700 disabled:opacity-40"
+                    >
+                      <SendHorizonal size={11} />
+                      Send for approval
+                    </button>
+                    <button
+                      onClick={() => { setShowDateRequest(false); setRequestedDate(''); setRequestReason('') }}
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-500 hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Set Priority */}
@@ -483,19 +560,45 @@ export function TaskProgressDrawer({ task, onClose }: Props) {
                     {t}
                   </span>
                 ))}
-                {/* Form inline to add a tag */}
-                <button
-                  onClick={() => {
-                    const newTag = prompt('Enter tag name:')
-                    if (newTag?.trim()) {
-                      updateTask(task.id, { tags: [...task.tags, newTag.trim()] })
-                    }
-                  }}
-                  className="flex items-center gap-1 rounded-full border border-slate-200 bg-white hover:bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-400"
-                >
-                  <Plus size={10} />
-                  Add tag
-                </button>
+                 {isAddingTag ? (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      if (newTagInput.trim()) {
+                        updateTask(task.id, { tags: [...task.tags, newTagInput.trim()] })
+                      }
+                      setNewTagInput('')
+                      setIsAddingTag(false)
+                    }}
+                    className="flex items-center"
+                  >
+                    <input
+                      type="text"
+                      value={newTagInput}
+                      onChange={(e) => setNewTagInput(e.target.value)}
+                      onBlur={() => {
+                        setTimeout(() => {
+                          if (newTagInput.trim()) {
+                            updateTask(task.id, { tags: [...task.tags, newTagInput.trim()] })
+                          }
+                          setNewTagInput('')
+                          setIsAddingTag(false)
+                        }, 200)
+                      }}
+                      placeholder="Tag..."
+                      className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[10px] font-medium text-slate-700 w-16 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                      autoFocus
+                    />
+                  </form>
+                ) : (
+                  <button
+                    onClick={() => setIsAddingTag(true)}
+                    className="flex items-center gap-1 rounded-full border border-slate-200 bg-white hover:bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-400"
+                  >
+                    <Plus size={10} />
+                    Add tag
+                  </button>
+                )}
               </div>
             </div>
 

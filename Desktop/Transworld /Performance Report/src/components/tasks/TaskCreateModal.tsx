@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ChevronRight, ChevronLeft, Plus, Trash2, ChevronDown } from 'lucide-react'
 import { useTaskStore } from '@/store/taskStore'
 import { PROFILES, DEPARTMENTS } from '@/lib/mockData'
-import { cn } from '@/lib/utils'
+import { cn, getUserHierarchyLevel } from '@/lib/utils'
 import { Dialog, DialogContent } from '@/components/ui/Dialog'
 import type { Task, TaskPriority, TaskStatus, MeasurementType, CurrencyCode, Milestone } from '@/types/database'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, eachDayOfInterval, isSameDay, isSameMonth, isToday } from 'date-fns'
@@ -11,6 +11,7 @@ interface Props {
   currentUserId: string
   defaultDeptId?: string | null
   onClose: () => void
+  lockAssignee?: boolean
 }
 
 const MEASUREMENT_OPTIONS: { value: MeasurementType; label: string; defaultUnit: string }[] = [
@@ -59,7 +60,7 @@ function newMilestoneRow(): MilestoneRow {
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
-export function TaskCreateModal({ currentUserId, defaultDeptId, onClose }: Props) {
+export function TaskCreateModal({ currentUserId, defaultDeptId, onClose, lockAssignee = false }: Props) {
   const { addTask, addMilestones } = useTaskStore()
 
   const [title, setTitle]         = useState('')
@@ -70,7 +71,7 @@ export function TaskCreateModal({ currentUserId, defaultDeptId, onClose }: Props
   const [calendarMonth, setCalendarMonth] = useState(startOfMonth(new Date()))
   const [dueTime, setDueTime]     = useState('09:00')
   const [priority, setPriority]   = useState<TaskPriority>('medium')
-  const [status, setStatus]       = useState<TaskStatus>('ready')
+  const [status, setStatus]       = useState<TaskStatus>('in_progress')
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [progressTab, setProgressTab]   = useState<'none' | 'quantity' | 'value' | 'milestone'>('none')
 
@@ -141,7 +142,13 @@ export function TaskCreateModal({ currentUserId, defaultDeptId, onClose }: Props
     onClose()
   }
 
-  const employees = PROFILES.filter((p) => p.role !== 'executive')
+  const currentUser = PROFILES.find((p) => p.id === currentUserId)
+  const currentUserLevel = getUserHierarchyLevel(currentUser?.designation)
+  const employees = lockAssignee
+    ? (currentUser ? [currentUser] : [])
+    : PROFILES.filter((p) => {
+        return getUserHierarchyLevel(p.designation) >= currentUserLevel
+      })
 
   // Calendar helpers
   const calendarDays = eachDayOfInterval({
@@ -185,22 +192,24 @@ export function TaskCreateModal({ currentUserId, defaultDeptId, onClose }: Props
           </div>
 
           {/* Assignee */}
-          <div>
-            <label className="block text-base font-bold text-slate-900 mb-2">Assignee</label>
-            <div className="relative">
-              <select
-                value={assigneeId}
-                onChange={(e) => setAssignee(e.target.value)}
-                className={cn(fieldBase, 'appearance-none pr-10', errors.assignee && 'border-red-400')}
-              >
-                {employees.map((p) => (
-                  <option key={p.id} value={p.id}>{p.full_name}</option>
-                ))}
-              </select>
-              <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          {!lockAssignee && (
+            <div>
+              <label className="block text-base font-bold text-slate-900 mb-2">Assignee</label>
+              <div className="relative">
+                <select
+                  value={assigneeId}
+                  onChange={(e) => setAssignee(e.target.value)}
+                  className={cn(fieldBase, 'appearance-none pr-10', errors.assignee && 'border-red-400')}
+                >
+                  {employees.map((p) => (
+                    <option key={p.id} value={p.id}>{p.full_name}</option>
+                  ))}
+                </select>
+                <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              </div>
+              {errors.assignee && <p className="mt-1 text-xs text-red-500">{errors.assignee}</p>}
             </div>
-            {errors.assignee && <p className="mt-1 text-xs text-red-500">{errors.assignee}</p>}
-          </div>
+          )}
 
           {/* Category / Department */}
           <div>
@@ -313,31 +322,6 @@ export function TaskCreateModal({ currentUserId, defaultDeptId, onClose }: Props
                   className={cn(
                     'rounded-full border px-4 py-1.5 text-sm font-medium transition-all',
                     priority === opt.value ? opt.selected : opt.chip,
-                  )}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Status chips */}
-          <div>
-            <label className="block text-base font-bold text-slate-900 mb-2">Status</label>
-            <div className="flex gap-2">
-              {([
-                { value: 'backlog',     label: 'Backlog',      sel: 'bg-slate-100 border-slate-300 text-slate-700' },
-                { value: 'ready',       label: 'Ready',        sel: 'bg-blue-50 border-blue-300 text-blue-700' },
-                { value: 'in_progress', label: 'In Progress',  sel: 'bg-amber-50 border-amber-300 text-amber-700' },
-              ] as const).map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setStatus(opt.value as TaskStatus)}
-                  className={cn(
-                    'rounded-full border px-4 py-1.5 text-sm font-medium transition-all',
-                    status === opt.value
-                      ? opt.sel
-                      : 'border-slate-200 text-slate-500 hover:border-slate-300',
                   )}
                 >
                   {opt.label}

@@ -2,8 +2,14 @@ import { Badge } from './Badge'
 import { statusColor, priorityColor } from '@/lib/utils'
 import type { TaskStatus, TaskPriority } from '@/types/database'
 
+export const STATUS_LABELS: Record<string, string> = {
+  in_progress: 'In Progress',
+  blocked:     'On Hold',
+  done:        'Completed',
+}
+
 export function StatusBadge({ status }: { status: TaskStatus | string }) {
-  const label = status.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  const label = STATUS_LABELS[status] ?? status.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())
   return <Badge label={label} className={statusColor(status)} dot />
 }
 

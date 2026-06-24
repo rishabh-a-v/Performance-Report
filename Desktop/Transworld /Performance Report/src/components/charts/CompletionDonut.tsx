@@ -4,21 +4,23 @@ interface CompletionDonutProps {
   done: number
   active: number
   blocked: number
-  backlog: number
   height?: number
 }
 
-const COLORS = ['#10b981', '#3b82f6', '#ef4444', '#94a3b8']
+const COLOR_MAP: Record<string, string> = {
+  'Completed': '#10b981',
+  'In Progress': '#3b82f6',
+  'On Hold': '#ef4444',
+}
 
-export function CompletionDonut({ done, active, blocked, backlog, height = 200 }: CompletionDonutProps) {
+export function CompletionDonut({ done, active, blocked, height = 200 }: CompletionDonutProps) {
   const data = [
-    { name: 'Done',      value: done },
-    { name: 'Active',    value: active },
-    { name: 'Blocked',   value: blocked },
-    { name: 'Backlog',   value: backlog },
+    { name: 'Completed',   value: done },
+    { name: 'In Progress', value: active },
+    { name: 'On Hold',     value: blocked },
   ].filter((d) => d.value > 0)
 
-  const total = done + active + blocked + backlog
+  const total = done + active + blocked
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
 
   return (
@@ -34,7 +36,7 @@ export function CompletionDonut({ done, active, blocked, backlog, height = 200 }
             paddingAngle={2}
             dataKey="value"
           >
-            {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+            {data.map((entry, i) => <Cell key={i} fill={COLOR_MAP[entry.name]} />)}
           </Pie>
           <Tooltip
             contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}

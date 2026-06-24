@@ -18,13 +18,12 @@ import {
 export function Analytics() {
   const { getMeasurableTasks } = useTaskStore()
   const measurable = getMeasurableTasks()
-  const employees = PROFILES.filter((p) => p.role === 'employee')
+  const employees = PROFILES.filter((p) => p.role === 'executive')
 
   // Overall efficiency metrics
   const done    = TASKS.filter((t) => t.status === 'done').length
   const active  = TASKS.filter((t) => t.status === 'in_progress').length
   const blocked = TASKS.filter((t) => t.status === 'blocked').length
-  const backlog = TASKS.filter((t) => t.status === 'backlog' || t.status === 'ready').length
   const rate    = completionRate(done, TASKS.length)
 
   const completedWithCycle = TASKS.filter((t) => t.cycle_time_hours != null)
@@ -43,7 +42,7 @@ export function Analytics() {
       emp,
       count: t.length,
       kpi: snap?.kpi_score ?? 70,
-      utilPct: snap ? Math.min(100, Math.round((t.filter((tk) => tk.status !== 'done' && tk.status !== 'backlog').length / Math.max(t.length, 1)) * 100 + 40)) : 60,
+      utilPct: snap ? Math.min(100, Math.round((t.filter((tk) => tk.status !== 'done').length / Math.max(t.length, 1)) * 100 + 40)) : 60,
     }
   })
   const overloaded    = utilisation.filter((u) => u.utilPct >= 90)
@@ -55,7 +54,7 @@ export function Analytics() {
     return {
       name: d.name.slice(0, 5),
       completed: dt.filter((t) => t.status === 'done').length,
-      active:    dt.filter((t) => t.status === 'in_progress' || t.status === 'ready').length,
+      active:    dt.filter((t) => t.status === 'in_progress').length,
       blocked:   dt.filter((t) => t.status === 'blocked').length,
     }
   })
@@ -74,7 +73,7 @@ export function Analytics() {
         {/* Task distribution donut */}
         <Card>
           <CardHeader><CardTitle>Task Distribution</CardTitle></CardHeader>
-          <CompletionDonut done={done} active={active} blocked={blocked} backlog={backlog} />
+          <CompletionDonut done={done} active={active} blocked={blocked} />
         </Card>
 
         {/* Completion trend */}

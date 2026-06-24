@@ -41,8 +41,6 @@ export function kpiScore(metrics: { completed: number; total: number; blockedHou
 
 export function statusColor(status: string) {
   const map: Record<string, string> = {
-    backlog:     'bg-slate-100 text-slate-600',
-    ready:       'bg-blue-100 text-blue-700',
     in_progress: 'bg-amber-100 text-amber-700',
     blocked:     'bg-red-100 text-red-700',
     done:        'bg-emerald-100 text-emerald-700',
@@ -93,3 +91,35 @@ export function initials(name: string) {
 export function currentWeekLabel() {
   return format(new Date(), "'W'ww · yyyy")
 }
+
+export function getUserHierarchyLevel(designation: string | null | undefined): number {
+  if (!designation) return 6 // Default to level 6 (Employee)
+  const d = designation.toLowerCase()
+
+  if (d === 'managing director') return 1
+
+  if (
+    d === 'cfo' ||
+    d.includes('vp') ||
+    d.startsWith('head of') ||
+    d.includes('director')
+  ) {
+    return 2
+  }
+
+  if (d.includes('branch manager')) return 3
+
+  if (
+    d.includes('department manager') ||
+    d.includes('engineering manager') ||
+    d.includes('sales manager') ||
+    d.endsWith('manager')
+  ) {
+    return 4
+  }
+
+  if (d.includes('lead') || d.includes('supervisor')) return 5
+
+  return 6 // Default to Employee (Level 6)
+}
+

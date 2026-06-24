@@ -1,5 +1,5 @@
-export type UserRole = 'employee' | 'manager' | 'department_head' | 'executive'
-export type TaskStatus = 'backlog' | 'ready' | 'in_progress' | 'blocked' | 'done'
+export type UserRole = 'executive' | 'manager' | 'director' | 'managing_director'
+export type TaskStatus = 'in_progress' | 'blocked' | 'done'
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical'
 export type AuditStatus = 'assigned' | 'in_progress' | 'completed' | 'pending'
 export type MeasurementType =
@@ -243,15 +243,216 @@ export interface Notification {
   created_at: string
 }
 
-// ─── AI Insights ─────────────────────────────────────────────────────────────
 
-export interface AIInsight {
+// ─── Job Directions ───────────────────────────────────────────────────────────
+
+export type JobDirectionStatus = 'draft' | 'active' | 'submitted' | 'approved' | 'rejected' | 'completed'
+export type JobDirectionProgressType = 'quantity' | 'value' | 'milestone'
+export type SpecialTaskStatus = 'pending' | 'in_progress' | 'on_hold' | 'completed'
+
+export interface JobDirection {
   id: string
-  scope: 'employee' | 'team' | 'department' | 'executive'
-  target_id: string   // user_id or department_id
+  title: string
+  description: string | null
+  employee_id: string
+  manager_id: string
+  department_id: string | null
+  progress_type: JobDirectionProgressType
+  target_value: number | null
+  current_value: number | null
+  unit: string | null
+  progress_percentage: number
+  status: JobDirectionStatus
+  review_notes: string | null
+  due_date?: string | null
+  submitted_for_review_at: string | null
+  approved_at: string | null
+  rejected_at: string | null
+  created_at: string
+  updated_at: string
+  pendingEdits?: {
+    title: string
+    description: string | null
+    target_value: number | null
+  } | null
+}
+
+export interface JDMilestone {
+  id: string
+  job_direction_id: string
+  title: string
+  weight: number          // 0–100, weights across a JD sum to 100
+  completed: boolean
+  completed_at: string | null
+  sort_order: number
+  created_at: string
+}
+
+export interface SpecialTask {
+  id: string
+  title: string
+  description: string | null
+  assigned_to: string
+  assigned_by: string
+  priority: TaskPriority  // reuse existing: low | medium | high | critical
+  due_date: string | null
+  status: SpecialTaskStatus
+  created_at: string
+  updated_at: string
+}
+
+// ─── Branch ───────────────────────────────────────────────────────────────────
+export interface Branch {
+  id: string
+  name: string
+  city: string
+  state: string
+  head_id: string | null
+}
+
+// ─── CSC Daily Report ─────────────────────────────────────────────────────────
+export interface CSCDailyReport {
+  id: string
+  employee_id: string
+  branch_id: string
+  report_date: string
+  hhg_packing_jobs: number
+  customers_called_packing: number
+  or_dc_commercial_moves: number
+  customers_called_move: number
+  in_transit_shipments: number
+  customers_called_transit: number
+  challenges: string | null
+  created_at: string
+  updated_at: string
+}
+
+// ─── CET Daily Report ─────────────────────────────────────────────────────────
+export interface CETDailyReport {
+  id: string
+  employee_id: string
+  branch_id: string
+  report_date: string
+  estimations_reviewed: number
+  estimations_corrected: number
+  jobs_confirmed: number
+  quotes_pending: number
+  total_estimate_value: number
+  challenges: string | null
+  created_at: string
+  updated_at: string
+}
+
+// ─── EQB Order ───────────────────────────────────────────────────────────────
+export interface EQBOrder {
+  id: string
+  branch_id: string
+  employee_id: string
+  order_date: string
+  order_value: number
+  customer_name: string
+  status: 'generated' | 'confirmed' | 'cancelled'
+  created_at: string
+}
+
+// ─── Unbilled Report ─────────────────────────────────────────────────────────
+export interface UnbilledReport {
+  id: string
+  branch_id: string
+  employee_id: string
+  report_date: string
+  pending_pos: number
+  pending_po_value: number
+  completed_jobs_not_billed: number
+  unbilled_job_value: number
+  damages_pending: number
+  damage_value: number
+  billed_jobs: number
+  total_completed_jobs: number
+  resolved_damages: number
+  closed_pos: number
+  remarks: string | null
+  created_at: string
+}
+
+// ─── DPR (Daily Performance Report) ──────────────────────────────────────────
+export interface DailyPerformanceReport {
+  id: string
+  branch_id: string
+  submitted_by: string
+  report_date: string
+  daily_revenue: number
+  jobs_completed: number
+  jobs_open: number
+  jobs_delayed: number
+  pending_billing: number
+  pending_damage_claims: number
+  customer_followups: number
+  challenges: string | null
+  created_at: string
+}
+
+// ─── Employee Performance Score ───────────────────────────────────────────────
+export type PerformanceCategory =
+  | 'exceptional'
+  | 'exceeds_expectations'
+  | 'meets_expectations'
+  | 'needs_improvement'
+  | 'critical_attention'
+
+export interface EmployeePerformanceScore {
+  user_id: string
   period: string
-  summary: string
-  risks: string[]
-  recommendations: string[]
-  generated_at: string
+  task_completion_score: number
+  kpi_achievement_score: number
+  productivity_score: number
+  timeliness_score: number
+  manager_feedback_score: number
+  total_score: number
+  category: PerformanceCategory
+  computed_at: string
+}
+
+export type ReviewType = 'self' | 'subordinate' | 'company'
+export type ReviewStatus = 'draft' | 'submitted' | 'approved' | 'rejected'
+
+export interface PerformanceReview {
+  id: string
+  employee_id: string
+  employee_name: string
+  employee_role: string
+  review_period: string
+  review_type: ReviewType
+  
+  // Subordinate targets
+  reviewed_employee_id?: string | null
+  reviewed_employee_name?: string | null
+
+  // Self Review / Template fields
+  objectives_assigned?: string | null
+  objectives_completed?: string | null
+  progress_percentage?: number | null
+  achievements?: string | null
+  challenges?: string | null
+  support_required?: string | null
+  next_period_goals?: string | null
+  
+  // Company Review (MD specific)
+  company_performance?: string | null
+  branch_performance?: string | null
+  department_performance?: string | null
+  major_risks?: string | null
+  strategic_decisions?: string | null
+  future_plans?: string | null
+
+  // Subordinate Review fields
+  rating?: number | null // 1-5 scale
+  areas_for_improvement?: string | null
+  manager_comments?: string | null
+  recommended_action?: string | null
+
+  status: ReviewStatus
+  submitted_at: string | null
+  created_at: string
+  rejection_note?: string | null
 }

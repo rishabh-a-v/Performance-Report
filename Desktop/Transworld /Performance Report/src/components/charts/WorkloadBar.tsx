@@ -21,8 +21,8 @@ export function WorkloadBar({ data, height = 220 }: WorkloadBarProps) {
         />
         <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
         <Bar dataKey="completed" name="Completed" fill="#10b981" radius={[3, 3, 0, 0]} />
-        <Bar dataKey="active"    name="Active"    fill="#3b82f6" radius={[3, 3, 0, 0]} />
-        <Bar dataKey="blocked"   name="Blocked"   fill="#ef4444" radius={[3, 3, 0, 0]} />
+        <Bar dataKey="active"    name="In Progress" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+        <Bar dataKey="blocked"   name="On Hold"   fill="#ef4444" radius={[3, 3, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   )

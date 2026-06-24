@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* Minimalist Light-Mode Theme (WeCraft Style) */
+    /* Minimalist Light-Mode Theme */
     --background: 210 20% 97.5%; /* Soft slate gray-blue: #f8f9fa */
     --foreground: 222 47% 11%;
     --card: 0 0% 100%; /* Pure white cards */

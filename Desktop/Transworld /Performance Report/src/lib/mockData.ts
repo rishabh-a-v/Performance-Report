@@ -1,28 +1,59 @@
-import type { Profile, Department, Task, DailyCheckin, Blocker, Invoice, Audit, FinanceKPI, PerformanceSnapshot, DepartmentSnapshot, TaskProgressHistory, Milestone } from '@/types/database'
+import type { Profile, Department, Branch, Task, DailyCheckin, Blocker, Invoice, Audit, FinanceKPI, PerformanceSnapshot, DepartmentSnapshot, TaskProgressHistory, Milestone, JobDirection, JDMilestone, SpecialTask, CSCDailyReport, CETDailyReport, EQBOrder, UnbilledReport, DailyPerformanceReport } from '@/types/database'
 
 export const DEPARTMENTS: Department[] = [
-  { id: 'd1', name: 'Engineering',  head_id: 'u3', budget: 2000000, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'd2', name: 'Finance',      head_id: 'u4', budget: 800000,  created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'd3', name: 'Sales',        head_id: 'u5', budget: 1200000, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'd4', name: 'Operations',   head_id: 'u6', budget: 600000,  created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'd5', name: 'HR',           head_id: 'u7', budget: 400000,  created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'd1', name: 'Engineering',  head_id: null,  budget: 2000000, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'd2', name: 'Finance',      head_id: 'u5',  budget: 800000,  created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'd3', name: 'Sales',        head_id: 'u8',  budget: 1200000, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'd4', name: 'Operations',   head_id: 'u6',  budget: 600000,  created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'd5', name: 'HR',           head_id: 'u7',  budget: 400000,  created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'd6', name: 'CSC',          head_id: 'u20', budget: 500000,  created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'd7', name: 'CET',          head_id: 'u23', budget: 450000,  created_at: '2024-01-01', updated_at: '2024-01-01' },
+]
+
+export const BRANCHES: Branch[] = [
+  { id: 'b1', name: 'Mumbai HQ',   city: 'Mumbai',    state: 'Maharashtra', head_id: 'u1'  },
+  { id: 'b2', name: 'Delhi NCR',   city: 'New Delhi', state: 'Delhi',       head_id: 'u2'  },
+  { id: 'b3', name: 'Chennai',     city: 'Chennai',   state: 'Tamil Nadu',  head_id: 'u22' },
+  { id: 'b4', name: 'Bengaluru',   city: 'Bengaluru', state: 'Karnataka',   head_id: 'u24' },
+  { id: 'b5', name: 'Hyderabad',   city: 'Hyderabad', state: 'Telangana',   head_id: 'u25' },
+  { id: 'b6', name: 'Kolkata',     city: 'Kolkata',   state: 'West Bengal', head_id: null  },
 ]
 
 export const PROFILES: Profile[] = [
-  { id: 'u1',  email: 'md@transworld.com',          full_name: 'Arjun Mehta',       role: 'executive',        department_id: null, manager_id: null,  employee_code: 'EX001', designation: 'Managing Director',     is_active: true, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'u2',  email: 'cfo@transworld.com',         full_name: 'Priya Sharma',      role: 'executive',        department_id: 'd2', manager_id: null,  employee_code: 'EX002', designation: 'CFO',                   is_active: true, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'u3',  email: 'eng.head@transworld.com',    full_name: 'Rahul Verma',       role: 'department_head',  department_id: 'd1', manager_id: 'u1',  employee_code: 'DH001', designation: 'VP Engineering',        is_active: true, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'u4',  email: 'fin.head@transworld.com',    full_name: 'Neha Gupta',        role: 'department_head',  department_id: 'd2', manager_id: 'u2',  employee_code: 'DH002', designation: 'Head of Finance',       is_active: true, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'u5',  email: 'sales.head@transworld.com',  full_name: 'Karan Singh',       role: 'department_head',  department_id: 'd3', manager_id: 'u1',  employee_code: 'DH003', designation: 'VP Sales',              is_active: true, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'u6',  email: 'ops.head@transworld.com',    full_name: 'Divya Patel',       role: 'department_head',  department_id: 'd4', manager_id: 'u1',  employee_code: 'DH004', designation: 'Head of Operations',    is_active: true, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'u7',  email: 'hr.head@transworld.com',     full_name: 'Ananya Roy',        role: 'department_head',  department_id: 'd5', manager_id: 'u1',  employee_code: 'DH005', designation: 'Head of HR',            is_active: true, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'u8',  email: 'mgr1@transworld.com',        full_name: 'Vikram Joshi',      role: 'manager',          department_id: 'd1', manager_id: 'u3',  employee_code: 'MG001', designation: 'Engineering Manager',   is_active: true, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'u9',  email: 'mgr2@transworld.com',        full_name: 'Sunita Reddy',      role: 'manager',          department_id: 'd3', manager_id: 'u5',  employee_code: 'MG002', designation: 'Sales Manager',         is_active: true, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'u10', email: 'emp1@transworld.com',        full_name: 'Amit Kumar',        role: 'employee',         department_id: 'd1', manager_id: 'u8',  employee_code: 'EM001', designation: 'Senior Developer',      is_active: true, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'u11', email: 'emp2@transworld.com',        full_name: 'Sneha Iyer',        role: 'employee',         department_id: 'd1', manager_id: 'u8',  employee_code: 'EM002', designation: 'Frontend Developer',    is_active: true, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'u12', email: 'emp3@transworld.com',        full_name: 'Rohit Nair',        role: 'employee',         department_id: 'd3', manager_id: 'u9',  employee_code: 'EM003', designation: 'Sales Executive',       is_active: true, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'u13', email: 'emp4@transworld.com',        full_name: 'Pooja Bhatt',       role: 'employee',         department_id: 'd2', manager_id: 'u4',  employee_code: 'EM004', designation: 'Finance Analyst',       is_active: true, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
-  { id: 'u14', email: 'demo@transworld.com',        full_name: 'Demo User',         role: 'employee',         department_id: 'd1', manager_id: 'u8',  employee_code: 'EM005', designation: 'Full Stack Developer',  is_active: true, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  // ── Top Level ────────────────────────────────────────────────────────────────
+  { id: 'u1',  email: 'md@transworld.com',          full_name: 'Rajesh Mehta',      role: 'managing_director', department_id: null, manager_id: null,  employee_code: 'EX001', designation: 'Managing Director',   is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  // ── Directors ────────────────────────────────────────────────────────────────
+  { id: 'u2',  email: 'cfo@transworld.com',         full_name: 'Anil Kumar',        role: 'director',          department_id: 'd2', manager_id: 'u1',  employee_code: 'DH001', designation: 'Director',            is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u3',  email: 'eng.head@transworld.com',    full_name: 'Priya Nair',        role: 'director',          department_id: 'd4', manager_id: 'u1',  employee_code: 'DH002', designation: 'Director',            is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  // ── Executive Assistant ───────────────────────────────────────────────────────
+  { id: 'u4',  email: 'fin.head@transworld.com',    full_name: 'Neha Sharma',       role: 'executive',         department_id: null, manager_id: 'u1',  employee_code: 'EA001', designation: 'Executive Assistant', is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  // ── Managers ─────────────────────────────────────────────────────────────────
+  { id: 'u5',  email: 'sales.head@transworld.com',  full_name: 'Ravi Kumar',        role: 'manager',           department_id: 'd2', manager_id: 'u2',  employee_code: 'MG001', designation: 'Finance Manager',     is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u6',  email: 'ops.head@transworld.com',    full_name: 'Arjun Singh',       role: 'manager',           department_id: 'd4', manager_id: 'u3',  employee_code: 'MG002', designation: 'Operations Manager',  is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u7',  email: 'hr.head@transworld.com',     full_name: 'Sneha Patel',       role: 'manager',           department_id: 'd5', manager_id: 'u3',  employee_code: 'MG003', designation: 'HR Manager',          is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u8',  email: 'mgr1@transworld.com',        full_name: 'Karan Verma',       role: 'manager',           department_id: 'd3', manager_id: 'u2',  employee_code: 'MG004', designation: 'Sales Manager',       is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  // ── Executives ───────────────────────────────────────────────────────────────
+  { id: 'u9',  email: 'mgr2@transworld.com',        full_name: 'Amit Gupta',        role: 'executive',         department_id: 'd2', manager_id: 'u5',  employee_code: 'EM001', designation: 'Finance Executive',   is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u10', email: 'emp1@transworld.com',        full_name: 'Pooja Reddy',       role: 'executive',         department_id: 'd2', manager_id: 'u5',  employee_code: 'EM002', designation: 'Finance Executive',   is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u11', email: 'emp2@transworld.com',        full_name: 'Rohit Das',         role: 'executive',         department_id: 'd4', manager_id: 'u6',  employee_code: 'EM003', designation: 'Operations Executive',is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u12', email: 'emp3@transworld.com',        full_name: 'Meera Iyer',        role: 'executive',         department_id: 'd4', manager_id: 'u6',  employee_code: 'EM004', designation: 'Operations Executive',is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u13', email: 'emp4@transworld.com',        full_name: 'Vikram Shah',       role: 'executive',         department_id: 'd5', manager_id: 'u7',  employee_code: 'EM005', designation: 'HR Executive',        is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u14', email: 'demo@transworld.com',        full_name: 'Ananya Rao',        role: 'executive',         department_id: 'd3', manager_id: 'u8',  employee_code: 'EM006', designation: 'Sales Executive',     is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  // ── Legacy profiles (inactive — referenced in historical task data) ───────────
+  { id: 'u15', email: 'sales2@transworld.com',      full_name: 'Meena Kapoor',      role: 'executive',         department_id: 'd3', manager_id: 'u8',  employee_code: 'EM007', designation: 'Sales Executive',     is_active: false, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u16', email: 'ops.mgr@transworld.com',     full_name: 'Suresh Pillai',     role: 'manager',           department_id: 'd4', manager_id: 'u6',  employee_code: 'MG005', designation: 'Operations Manager',  is_active: false, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u17', email: 'ops2@transworld.com',        full_name: 'Devika Nair',       role: 'executive',         department_id: 'd4', manager_id: 'u16', employee_code: 'EM008', designation: 'Operations Executive',is_active: false, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u18', email: 'hr2@transworld.com',         full_name: 'Kavya Reddy',       role: 'executive',         department_id: 'd5', manager_id: 'u7',  employee_code: 'EM009', designation: 'HR Executive',        is_active: false, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u19', email: 'fin2@transworld.com',        full_name: 'Ankit Sharma',      role: 'executive',         department_id: 'd2', manager_id: 'u5',  employee_code: 'EM010', designation: 'Finance Executive',   is_active: false, avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  // ── CSC Team ─────────────────────────────────────────────────────────────────
+  { id: 'u20', email: 'csc.head@transworld.com',    full_name: 'Payal Gupta',       role: 'manager',           department_id: 'd6', manager_id: 'u6',  employee_code: 'MG006', designation: 'CSC Head',            is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u21', email: 'csc1@transworld.com',        full_name: 'Sunil Rao',         role: 'executive',         department_id: 'd6', manager_id: 'u20', employee_code: 'CS001', designation: 'CSC Executive',       is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u22', email: 'csc2@transworld.com',        full_name: 'Priya Jain',        role: 'executive',         department_id: 'd6', manager_id: 'u20', employee_code: 'CS002', designation: 'CSC Executive',       is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u26', email: 'csc3@transworld.com',        full_name: 'Suman Das',         role: 'executive',         department_id: 'd6', manager_id: 'u20', employee_code: 'CS003', designation: 'CSC Executive',       is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  // ── CET Team ─────────────────────────────────────────────────────────────────
+  { id: 'u23', email: 'cet.head@transworld.com',    full_name: 'Arjun Patel',       role: 'manager',           department_id: 'd7', manager_id: 'u1',  employee_code: 'MG007', designation: 'CET Manager',         is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u24', email: 'cet1@transworld.com',        full_name: 'Deepak Singh',      role: 'executive',         department_id: 'd7', manager_id: 'u23', employee_code: 'CT001', designation: 'Estimation Executive',is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
+  { id: 'u25', email: 'cet2@transworld.com',        full_name: 'Neha Verma',        role: 'executive',         department_id: 'd7', manager_id: 'u23', employee_code: 'CT002', designation: 'Estimation Executive',is_active: true,  avatar_url: null, created_at: '2024-01-01', updated_at: '2024-01-01' },
 ]
 
 export const TASKS: Task[] = [
@@ -30,11 +61,9 @@ export const TASKS: Task[] = [
   { id: 't2',  title: 'Dashboard performance optimisation',       description: 'Reduce TTI by 30% via code splitting',        status: 'blocked',     priority: 'high',     assignee_id: 'u11', created_by: 'u8',  department_id: 'd1', due_date: '2026-06-25', started_at: '2026-06-08', completed_at: null, cycle_time_hours: null, estimated_hours: 20, tags: ['frontend'],        created_at: '2026-06-01', updated_at: '2026-06-20' },
   { id: 't3',  title: 'Q2 financial reconciliation',              description: 'Reconcile all Q2 ledgers',                    status: 'done',        priority: 'critical', assignee_id: 'u13', created_by: 'u4',  department_id: 'd2', due_date: '2026-06-20', started_at: '2026-06-15', completed_at: '2026-06-19', cycle_time_hours: 96, estimated_hours: 80, tags: ['finance'],        created_at: '2026-06-01', updated_at: '2026-06-19' },
   { id: 't4',  title: 'Enterprise client onboarding (ACME)',      description: 'Coordinate full onboarding for ACME Corp',     status: 'in_progress', priority: 'critical', assignee_id: 'u12', created_by: 'u9',  department_id: 'd3', due_date: '2026-06-30', started_at: '2026-06-18', completed_at: null, cycle_time_hours: null, estimated_hours: 60, tags: ['sales', 'client'], created_at: '2026-06-10', updated_at: '2026-06-22' },
-  { id: 't5',  title: 'API rate limiting implementation',         description: 'Add token-bucket rate limiting to REST APIs',  status: 'ready',       priority: 'medium',   assignee_id: 'u10', created_by: 'u8',  department_id: 'd1', due_date: '2026-07-05', started_at: null, completed_at: null, cycle_time_hours: null, estimated_hours: 16, tags: ['backend', 'infra'], created_at: '2026-06-15', updated_at: '2026-06-15' },
-  { id: 't6',  title: 'Monthly KPI report — June',                description: 'Generate and distribute June KPI summary',    status: 'backlog',     priority: 'high',     assignee_id: 'u14', created_by: 'u8',  department_id: 'd1', due_date: '2026-07-03', started_at: null, completed_at: null, cycle_time_hours: null, estimated_hours: 8,  tags: ['reporting'],       created_at: '2026-06-20', updated_at: '2026-06-20' },
+  { id: 't5',  title: 'API rate limiting implementation',         description: 'Add token-bucket rate limiting to REST APIs',  status: 'in_progress',       priority: 'medium',   assignee_id: 'u10', created_by: 'u8',  department_id: 'd1', due_date: '2026-07-05', started_at: null, completed_at: null, cycle_time_hours: null, estimated_hours: 16, tags: ['backend', 'infra'], created_at: '2026-06-15', updated_at: '2026-06-15' },
   { id: 't7',  title: 'Invoice processing automation',            description: 'Automate invoice extraction via OCR',          status: 'in_progress', priority: 'high',     assignee_id: 'u13', created_by: 'u4',  department_id: 'd2', due_date: '2026-07-10', started_at: '2026-06-20', completed_at: null, cycle_time_hours: null, estimated_hours: 32, tags: ['finance', 'automation'], created_at: '2026-06-12', updated_at: '2026-06-22' },
   { id: 't8',  title: 'Sales pipeline CRM cleanup',               description: 'Remove stale leads from CRM',                  status: 'done',        priority: 'low',      assignee_id: 'u12', created_by: 'u9',  department_id: 'd3', due_date: '2026-06-18', started_at: '2026-06-14', completed_at: '2026-06-17', cycle_time_hours: 48, estimated_hours: 12, tags: ['sales'],           created_at: '2026-06-10', updated_at: '2026-06-17' },
-  { id: 't9',  title: 'Implement dark mode across app',           description: 'Tailwind dark mode token pass',                status: 'backlog',     priority: 'low',      assignee_id: 'u14', created_by: 'u8',  department_id: 'd1', due_date: '2026-07-15', started_at: null, completed_at: null, cycle_time_hours: null, estimated_hours: 12, tags: ['frontend'],        created_at: '2026-06-22', updated_at: '2026-06-22' },
   { id: 't10', title: 'Annual audit preparation',                 description: 'Prepare documents for statutory audit',        status: 'in_progress', priority: 'critical', assignee_id: 'u13', created_by: 'u4',  department_id: 'd2', due_date: '2026-06-30', started_at: '2026-06-16', completed_at: null, cycle_time_hours: null, estimated_hours: 48, tags: ['audit'],            created_at: '2026-06-10', updated_at: '2026-06-22' },
 ]
 
@@ -159,11 +188,11 @@ export const blockersForUser = (userId: string) => BLOCKERS.filter((b) => b.empl
 export const activeBlockers  = () => BLOCKERS.filter((b) => !b.resolved_at)
 
 export const DEMO_CREDENTIALS: Record<string, string> = {
-  'md@transworld.com':          'Arjun Mehta · Managing Director',
-  'eng.head@transworld.com':    'Rahul Verma · VP Engineering',
-  'mgr1@transworld.com':        'Vikram Joshi · Engineering Manager',
-  'demo@transworld.com':        'Demo User · Full Stack Developer',
-  'fin.head@transworld.com':    'Neha Gupta · Head of Finance',
+  'md@transworld.com':          'Rajesh Mehta · Managing Director',
+  'cfo@transworld.com':         'Anil Kumar · Director',
+  'mgr1@transworld.com':        'Karan Verma · Sales Manager',
+  'demo@transworld.com':        'Ananya Rao · Sales Executive',
+  'fin.head@transworld.com':    'Neha Sharma · Executive Assistant',
 }
 
 // ─── Measurable tasks ────────────────────────────────────────────────────────
@@ -283,29 +312,6 @@ export const MEASURABLE_TASKS: Task[] = [
     target_quantity: 25,
     completed_quantity: 18,
     unit: 'Bugs',
-  },
-  {
-    id: 'mt6',
-    title: 'Test Coverage Expansion',
-    description: 'Increase unit + integration test coverage across all core modules.',
-    status: 'in_progress',
-    priority: 'medium',
-    assignee_id: 'u14',
-    created_by: 'u3',
-    department_id: 'd1',
-    due_date: '2026-06-30',
-    started_at: '2026-06-01T09:00:00Z',
-    completed_at: null,
-    cycle_time_hours: null,
-    estimated_hours: 50,
-    tags: ['engineering', 'testing', 'quality'],
-    created_at: '2026-05-30T10:00:00Z',
-    updated_at: '2026-06-22T08:00:00Z',
-    progress_model: 'quantity',
-    measurement_type: 'percentage',
-    target_quantity: 100,
-    completed_quantity: 67,
-    unit: '%',
   },
   {
     id: 'mt7',
@@ -475,3 +481,135 @@ export const PROGRESS_HISTORY: TaskProgressHistory[] = [
   { id: 'ph_mt7_2', task_id: 'mt7', recorded_date: '2026-06-15', completed_quantity: 18,  progress_percentage: 30.0, daily_delta: 4, created_at: '2026-06-15T18:00:00Z' },
   { id: 'ph_mt7_3', task_id: 'mt7', recorded_date: '2026-06-22', completed_quantity: 38,  progress_percentage: 63.3, daily_delta: 3, created_at: '2026-06-22T18:00:00Z' },
 ]
+
+export const JOB_DIRECTIONS: JobDirection[] = [
+  { id: 'jd1',  title: 'Monthly Invoice Processing — 1,500 Invoices', description: 'Process and reconcile a minimum of 1,500 invoices per month across all vendor accounts.', employee_id: 'u13', manager_id: 'u4',  department_id: 'd2', progress_type: 'quantity', target_value: 1500,    current_value: 900,     unit: 'Invoices', progress_percentage: 60,    status: 'active',    due_date: '2026-06-30', review_notes: null, submitted_for_review_at: null, approved_at: null, rejected_at: null, created_at: '2026-06-01T09:00:00Z', updated_at: '2026-06-22T08:00:00Z' },
+  { id: 'jd2',  title: 'Improve Collection Rate by 15%', description: 'Increase the accounts receivable collection rate from 82% to 97% by end of Q3.', employee_id: 'u13', manager_id: 'u4',  department_id: 'd2', progress_type: 'value',    target_value: 97,      current_value: 89,      unit: '%',        progress_percentage: 75,    status: 'submitted', review_notes: null, submitted_for_review_at: '2026-06-22T10:00:00Z', approved_at: null, rejected_at: null, created_at: '2026-04-01T09:00:00Z', updated_at: '2026-06-22T10:00:00Z' },
+  { id: 'jd3',  title: 'Q2 Enterprise Revenue Target — ₹50L', description: 'Close enterprise deals worth ₹50,00,000 in Q2 through new and existing accounts.', employee_id: 'u12', manager_id: 'u9',  department_id: 'd3', progress_type: 'value',    target_value: 5000000, current_value: 4100000, unit: 'INR',      progress_percentage: 82,    status: 'approved',  review_notes: 'Excellent progress. Keep pushing on the Pinnacle account.', submitted_for_review_at: '2026-06-20T09:00:00Z', approved_at: '2026-06-21T11:00:00Z', rejected_at: null, created_at: '2026-04-01T09:00:00Z', updated_at: '2026-06-21T11:00:00Z' },
+  { id: 'jd4',  title: 'New Client Acquisition — 20 Accounts', description: 'Onboard 20 new enterprise clients in the BFSI and Manufacturing verticals by end of Q3.', employee_id: 'u12', manager_id: 'u9',  department_id: 'd3', progress_type: 'quantity', target_value: 20,      current_value: 13,      unit: 'Clients',  progress_percentage: 65,    status: 'active',    review_notes: null, submitted_for_review_at: null, approved_at: null, rejected_at: null, created_at: '2026-04-01T09:00:00Z', updated_at: '2026-06-22T08:00:00Z' },
+  { id: 'jd5',  title: 'Lead Generation — 500 Qualified Leads', description: 'Generate 500 qualified leads through LinkedIn outreach and email campaigns by end of Q2.', employee_id: 'u15', manager_id: 'u9',  department_id: 'd3', progress_type: 'quantity', target_value: 500,     current_value: 312,     unit: 'Leads',    progress_percentage: 62.4,  status: 'active',    review_notes: null, submitted_for_review_at: null, approved_at: null, rejected_at: null, created_at: '2026-04-01T09:00:00Z', updated_at: '2026-06-22T08:00:00Z' },
+  { id: 'jd6',  title: 'Platform v3.0 Release', description: 'Lead backend engineering for the v3.0 platform release with zero P1 regressions.', employee_id: 'u10', manager_id: 'u8',  department_id: 'd1', progress_type: 'milestone', target_value: null,    current_value: null,    unit: null,       progress_percentage: 55,    status: 'active',    review_notes: null, submitted_for_review_at: null, approved_at: null, rejected_at: null, created_at: '2026-04-20T09:00:00Z', updated_at: '2026-06-22T08:00:00Z' },
+  { id: 'jd7',  title: 'Expand Test Coverage to 80%', description: 'Increase unit and integration test coverage across all core modules from 45% to 80%.', employee_id: 'u14', manager_id: 'u8',  department_id: 'd1', progress_type: 'quantity', target_value: 80,      current_value: 67,      unit: '%',        progress_percentage: 83.75, status: 'submitted', due_date: '2026-07-31', review_notes: null, submitted_for_review_at: '2026-06-22T09:00:00Z', approved_at: null, rejected_at: null, created_at: '2026-05-01T09:00:00Z', updated_at: '2026-06-22T09:00:00Z' },
+  { id: 'jd8',  title: 'API Documentation Overhaul', description: 'Rewrite all public API documentation with examples, error codes, and migration guides.', employee_id: 'u14', manager_id: 'u8',  department_id: 'd1', progress_type: 'milestone', target_value: null,    current_value: null,    unit: null,       progress_percentage: 30,    status: 'active',    due_date: '2026-08-31', review_notes: null, submitted_for_review_at: null, approved_at: null, rejected_at: null, created_at: '2026-05-15T09:00:00Z', updated_at: '2026-06-22T08:00:00Z' },
+  { id: 'jd9',  title: 'Frontend Performance Optimisation — 30% TTI Reduction', description: 'Reduce Time to Interactive by 30% across all dashboard views via code splitting and lazy loading.', employee_id: 'u11', manager_id: 'u8',  department_id: 'd1', progress_type: 'value',    target_value: 30,      current_value: 18,      unit: '%',        progress_percentage: 60,    status: 'rejected',  review_notes: 'Needs more rigorous benchmarking methodology. Please include Lighthouse scores and before/after comparison before resubmitting.', submitted_for_review_at: '2026-06-18T10:00:00Z', approved_at: null, rejected_at: '2026-06-20T14:00:00Z', created_at: '2026-05-01T09:00:00Z', updated_at: '2026-06-20T14:00:00Z' },
+  { id: 'jd10', title: 'Reduce Shipment Delays by 20%', description: 'Reduce average shipment delay rate from 12% to below 10% through vendor SLA enforcement and dispatch optimisation.', employee_id: 'u17', manager_id: 'u16', department_id: 'd4', progress_type: 'value',    target_value: 20,      current_value: 9,       unit: '%',        progress_percentage: 45,    status: 'active',    review_notes: null, submitted_for_review_at: null, approved_at: null, rejected_at: null, created_at: '2026-04-01T09:00:00Z', updated_at: '2026-06-22T08:00:00Z' },
+  { id: 'jd11', title: 'Improve Employee Satisfaction to 85%', description: 'Raise the H1 employee satisfaction score from 72% to 85% through targeted engagement and culture initiatives.', employee_id: 'u18', manager_id: 'u7',  department_id: 'd5', progress_type: 'value',    target_value: 85,      current_value: 72,      unit: '%',        progress_percentage: 72,    status: 'active',    review_notes: null, submitted_for_review_at: null, approved_at: null, rejected_at: null, created_at: '2026-01-01T09:00:00Z', updated_at: '2026-06-22T08:00:00Z' },
+  { id: 'jd12', title: 'Accounts Receivable Collection — ₹60L', description: 'Recover ₹60,00,000 in outstanding AR from overdue enterprise accounts by end of Q3.', employee_id: 'u19', manager_id: 'u4',  department_id: 'd2', progress_type: 'value',    target_value: 6000000, current_value: 3200000, unit: 'INR',      progress_percentage: 53.3,  status: 'active',    review_notes: null, submitted_for_review_at: null, approved_at: null, rejected_at: null, created_at: '2026-04-01T09:00:00Z', updated_at: '2026-06-22T08:00:00Z' },
+]
+
+export const JD_MILESTONES: JDMilestone[] = [
+  { id: 'jdms1',  job_direction_id: 'jd6', title: 'Technical Spec Approved',              weight: 10, completed: true,  completed_at: '2026-05-08T10:00:00Z', sort_order: 1, created_at: '2026-04-20T10:00:00Z' },
+  { id: 'jdms2',  job_direction_id: 'jd6', title: 'UI/UX Design Complete',                weight: 15, completed: true,  completed_at: '2026-05-22T10:00:00Z', sort_order: 2, created_at: '2026-04-20T10:00:00Z' },
+  { id: 'jdms3',  job_direction_id: 'jd6', title: 'Backend APIs Built',                   weight: 30, completed: true,  completed_at: '2026-06-18T10:00:00Z', sort_order: 3, created_at: '2026-04-20T10:00:00Z' },
+  { id: 'jdms4',  job_direction_id: 'jd6', title: 'Frontend Integration',                 weight: 25, completed: false, completed_at: null, sort_order: 4, created_at: '2026-04-20T10:00:00Z' },
+  { id: 'jdms5',  job_direction_id: 'jd6', title: 'QA Sign-off',                          weight: 10, completed: false, completed_at: null, sort_order: 5, created_at: '2026-04-20T10:00:00Z' },
+  { id: 'jdms6',  job_direction_id: 'jd6', title: 'Production Deployment',                weight: 10, completed: false, completed_at: null, sort_order: 6, created_at: '2026-04-20T10:00:00Z' },
+  { id: 'jdms7',  job_direction_id: 'jd8', title: 'Audit existing docs',                  weight: 15, completed: true,  completed_at: '2026-06-05T10:00:00Z', sort_order: 1, created_at: '2026-05-15T10:00:00Z' },
+  { id: 'jdms8',  job_direction_id: 'jd8', title: 'Write auth & user endpoints',          weight: 15, completed: true,  completed_at: '2026-06-18T10:00:00Z', sort_order: 2, created_at: '2026-05-15T10:00:00Z' },
+  { id: 'jdms9',  job_direction_id: 'jd8', title: 'Write billing & reporting endpoints',  weight: 25, completed: false, completed_at: null, sort_order: 3, created_at: '2026-05-15T10:00:00Z' },
+  { id: 'jdms10', job_direction_id: 'jd8', title: 'Code examples & SDK snippets',         weight: 25, completed: false, completed_at: null, sort_order: 4, created_at: '2026-05-15T10:00:00Z' },
+  { id: 'jdms11', job_direction_id: 'jd8', title: 'Review & publish',                     weight: 20, completed: false, completed_at: null, sort_order: 5, created_at: '2026-05-15T10:00:00Z' },
+]
+
+export const SPECIAL_TASKS: SpecialTask[] = [
+  { id: 'st1',  title: 'Prepare weekly engineering status report',         description: null, assigned_to: 'u14', assigned_by: 'u8',  priority: 'medium',   due_date: '2026-06-23', status: 'pending',     created_at: '2026-06-22T09:00:00Z', updated_at: '2026-06-22T09:00:00Z' },
+  { id: 'st2',  title: 'Review security audit findings',                   description: 'Go through the penetration test report and flag critical items.', assigned_to: 'u10', assigned_by: 'u8',  priority: 'high',     due_date: '2026-06-24', status: 'in_progress', created_at: '2026-06-21T09:00:00Z', updated_at: '2026-06-22T10:00:00Z' },
+  { id: 'st3',  title: 'Fix login page CSS on mobile',                     description: null, assigned_to: 'u11', assigned_by: 'u8',  priority: 'low',      due_date: '2026-06-25', status: 'pending',     created_at: '2026-06-22T09:00:00Z', updated_at: '2026-06-22T09:00:00Z' },
+  { id: 'st4',  title: 'Attend sprint retrospective',                      description: null, assigned_to: 'u14', assigned_by: 'u8',  priority: 'medium',   due_date: '2026-06-23', status: 'completed',   created_at: '2026-06-20T09:00:00Z', updated_at: '2026-06-22T16:00:00Z' },
+  { id: 'st5',  title: 'Create customer presentation for Horizon Pvt Ltd', description: 'Use the Q2 case study deck as base and customise for the logistics sector.', assigned_to: 'u12', assigned_by: 'u9',  priority: 'high',     due_date: '2026-06-24', status: 'in_progress', created_at: '2026-06-21T09:00:00Z', updated_at: '2026-06-22T09:00:00Z' },
+  { id: 'st6',  title: 'Follow up with Delta Solutions on overdue payment', description: null, assigned_to: 'u15', assigned_by: 'u9',  priority: 'high',     due_date: '2026-06-23', status: 'pending',     created_at: '2026-06-22T09:00:00Z', updated_at: '2026-06-22T09:00:00Z' },
+  { id: 'st7',  title: 'Update CRM with June discovery call notes',        description: null, assigned_to: 'u12', assigned_by: 'u9',  priority: 'low',      due_date: '2026-06-25', status: 'completed',   created_at: '2026-06-19T09:00:00Z', updated_at: '2026-06-22T12:00:00Z' },
+  { id: 'st8',  title: 'Contact Pinnacle Systems regarding INV-2026-004',  description: 'Invoice of ₹3.2L is 2 weeks overdue. Escalate if no response.', assigned_to: 'u19', assigned_by: 'u4',  priority: 'critical', due_date: '2026-06-23', status: 'in_progress', created_at: '2026-06-22T08:00:00Z', updated_at: '2026-06-22T10:00:00Z' },
+  { id: 'st9',  title: 'Prepare monthly finance summary for CFO',          description: null, assigned_to: 'u13', assigned_by: 'u4',  priority: 'high',     due_date: '2026-06-25', status: 'pending',     created_at: '2026-06-22T09:00:00Z', updated_at: '2026-06-22T09:00:00Z' },
+  { id: 'st10', title: 'Attend vendor audit meeting',                      description: null, assigned_to: 'u13', assigned_by: 'u4',  priority: 'medium',   due_date: '2026-06-23', status: 'completed',   created_at: '2026-06-20T09:00:00Z', updated_at: '2026-06-22T14:00:00Z' },
+  { id: 'st11', title: 'Call BlueDart logistics regarding June MIS report', description: null, assigned_to: 'u17', assigned_by: 'u16', priority: 'high',     due_date: '2026-06-23', status: 'in_progress', created_at: '2026-06-22T09:00:00Z', updated_at: '2026-06-22T10:00:00Z' },
+  { id: 'st12', title: 'Submit Q2 warehouse cost report to ops head',      description: null, assigned_to: 'u17', assigned_by: 'u16', priority: 'medium',   due_date: '2026-06-26', status: 'pending',     created_at: '2026-06-22T09:00:00Z', updated_at: '2026-06-22T09:00:00Z' },
+  { id: 'st13', title: 'Schedule onboarding session for new joiners',      description: null, assigned_to: 'u18', assigned_by: 'u7',  priority: 'medium',   due_date: '2026-06-24', status: 'pending',     created_at: '2026-06-22T09:00:00Z', updated_at: '2026-06-22T09:00:00Z' },
+  { id: 'st14', title: 'Send payslips for June payroll',                   description: null, assigned_to: 'u18', assigned_by: 'u7',  priority: 'high',     due_date: '2026-06-23', status: 'completed',   created_at: '2026-06-20T09:00:00Z', updated_at: '2026-06-22T16:00:00Z' },
+  { id: 'st15', title: 'Submit expense report — May',                      description: null, assigned_to: 'u14', assigned_by: 'u8',  priority: 'low',      due_date: '2026-06-20', status: 'pending',     created_at: '2026-06-15T09:00:00Z', updated_at: '2026-06-15T09:00:00Z' },
+  { id: 'st16', title: 'Draft Q3 sales strategy deck',                     description: null, assigned_to: 'u15', assigned_by: 'u9',  priority: 'high',     due_date: '2026-06-28', status: 'pending',     created_at: '2026-06-22T09:00:00Z', updated_at: '2026-06-22T09:00:00Z' },
+]
+
+// ─── CSC Daily Reports ────────────────────────────────────────────────────────
+export const CSC_REPORTS: CSCDailyReport[] = [
+  // Ravi Kumar (u21) — Mumbai — last 3 days
+  { id: 'csc1', employee_id: 'u21', branch_id: 'b1', report_date: '2026-06-22', hhg_packing_jobs: 12, customers_called_packing: 11, or_dc_commercial_moves: 8, customers_called_move: 8, in_transit_shipments: 15, customers_called_transit: 13, challenges: null, created_at: '2026-06-22T18:00:00Z', updated_at: '2026-06-22T18:00:00Z' },
+  { id: 'csc2', employee_id: 'u21', branch_id: 'b1', report_date: '2026-06-21', hhg_packing_jobs: 10, customers_called_packing: 9,  or_dc_commercial_moves: 6, customers_called_move: 6, in_transit_shipments: 14, customers_called_transit: 12, challenges: null, created_at: '2026-06-21T18:00:00Z', updated_at: '2026-06-21T18:00:00Z' },
+  { id: 'csc3', employee_id: 'u21', branch_id: 'b1', report_date: '2026-06-20', hhg_packing_jobs: 14, customers_called_packing: 12, or_dc_commercial_moves: 9, customers_called_move: 8, in_transit_shipments: 18, customers_called_transit: 14, challenges: 'High call volume; could not reach 4 transit customers.', created_at: '2026-06-20T18:00:00Z', updated_at: '2026-06-20T18:00:00Z' },
+  // Priya Jain (u22) — Chennai — last 3 days (lower transit coverage — at-risk)
+  { id: 'csc4', employee_id: 'u22', branch_id: 'b3', report_date: '2026-06-22', hhg_packing_jobs: 9,  customers_called_packing: 8,  or_dc_commercial_moves: 5, customers_called_move: 5, in_transit_shipments: 18, customers_called_transit: 10, challenges: 'Large number of in-transit shipments; transit follow-ups lagging.', created_at: '2026-06-22T18:00:00Z', updated_at: '2026-06-22T18:00:00Z' },
+  { id: 'csc5', employee_id: 'u22', branch_id: 'b3', report_date: '2026-06-21', hhg_packing_jobs: 8,  customers_called_packing: 7,  or_dc_commercial_moves: 4, customers_called_move: 3, in_transit_shipments: 16, customers_called_transit: 9,  challenges: null, created_at: '2026-06-21T18:00:00Z', updated_at: '2026-06-21T18:00:00Z' },
+  { id: 'csc6', employee_id: 'u22', branch_id: 'b3', report_date: '2026-06-20', hhg_packing_jobs: 11, customers_called_packing: 9,  or_dc_commercial_moves: 6, customers_called_move: 5, in_transit_shipments: 14, customers_called_transit: 8,  challenges: null, created_at: '2026-06-20T18:00:00Z', updated_at: '2026-06-20T18:00:00Z' },
+  // Suman Das (u26) — Delhi — last 3 days
+  { id: 'csc7', employee_id: 'u26', branch_id: 'b2', report_date: '2026-06-22', hhg_packing_jobs: 7,  customers_called_packing: 7,  or_dc_commercial_moves: 4, customers_called_move: 4, in_transit_shipments: 12, customers_called_transit: 11, challenges: null, created_at: '2026-06-22T18:00:00Z', updated_at: '2026-06-22T18:00:00Z' },
+  { id: 'csc8', employee_id: 'u26', branch_id: 'b2', report_date: '2026-06-21', hhg_packing_jobs: 8,  customers_called_packing: 8,  or_dc_commercial_moves: 5, customers_called_move: 5, in_transit_shipments: 10, customers_called_transit: 9,  challenges: null, created_at: '2026-06-21T18:00:00Z', updated_at: '2026-06-21T18:00:00Z' },
+  { id: 'csc9', employee_id: 'u26', branch_id: 'b2', report_date: '2026-06-20', hhg_packing_jobs: 6,  customers_called_packing: 6,  or_dc_commercial_moves: 3, customers_called_move: 3, in_transit_shipments: 11, customers_called_transit: 10, challenges: null, created_at: '2026-06-20T18:00:00Z', updated_at: '2026-06-20T18:00:00Z' },
+]
+
+// ─── CET Daily Reports ────────────────────────────────────────────────────────
+export const CET_REPORTS: CETDailyReport[] = [
+  // Deepak Singh (u24) — Mumbai — last 3 days
+  { id: 'cet1', employee_id: 'u24', branch_id: 'b1', report_date: '2026-06-22', estimations_reviewed: 18, estimations_corrected: 4, jobs_confirmed: 11, quotes_pending: 6,  total_estimate_value: 1850000, challenges: null, created_at: '2026-06-22T18:00:00Z', updated_at: '2026-06-22T18:00:00Z' },
+  { id: 'cet2', employee_id: 'u24', branch_id: 'b1', report_date: '2026-06-21', estimations_reviewed: 15, estimations_corrected: 3, jobs_confirmed: 9,  quotes_pending: 5,  total_estimate_value: 1520000, challenges: null, created_at: '2026-06-21T18:00:00Z', updated_at: '2026-06-21T18:00:00Z' },
+  { id: 'cet3', employee_id: 'u24', branch_id: 'b1', report_date: '2026-06-20', estimations_reviewed: 20, estimations_corrected: 6, jobs_confirmed: 12, quotes_pending: 8,  total_estimate_value: 2100000, challenges: 'Several complex HHG estimates required manual recalculation.', created_at: '2026-06-20T18:00:00Z', updated_at: '2026-06-20T18:00:00Z' },
+  // Neha Verma (u25) — Bengaluru — last 3 days (high conversion, low corrections — star)
+  { id: 'cet4', employee_id: 'u25', branch_id: 'b4', report_date: '2026-06-22', estimations_reviewed: 22, estimations_corrected: 2, jobs_confirmed: 17, quotes_pending: 3,  total_estimate_value: 2450000, challenges: null, created_at: '2026-06-22T18:00:00Z', updated_at: '2026-06-22T18:00:00Z' },
+  { id: 'cet5', employee_id: 'u25', branch_id: 'b4', report_date: '2026-06-21', estimations_reviewed: 19, estimations_corrected: 2, jobs_confirmed: 15, quotes_pending: 4,  total_estimate_value: 2100000, challenges: null, created_at: '2026-06-21T18:00:00Z', updated_at: '2026-06-21T18:00:00Z' },
+  { id: 'cet6', employee_id: 'u25', branch_id: 'b4', report_date: '2026-06-20', estimations_reviewed: 16, estimations_corrected: 1, jobs_confirmed: 13, quotes_pending: 2,  total_estimate_value: 1780000, challenges: null, created_at: '2026-06-20T18:00:00Z', updated_at: '2026-06-20T18:00:00Z' },
+  // Arjun Patel (u23) — manager reviewing too
+  { id: 'cet7', employee_id: 'u23', branch_id: 'b1', report_date: '2026-06-22', estimations_reviewed: 10, estimations_corrected: 1, jobs_confirmed: 8,  quotes_pending: 2,  total_estimate_value: 980000,  challenges: null, created_at: '2026-06-22T18:00:00Z', updated_at: '2026-06-22T18:00:00Z' },
+]
+
+// ─── EQB Orders ───────────────────────────────────────────────────────────────
+export const EQB_ORDERS: EQBOrder[] = [
+  { id: 'eqb1',  branch_id: 'b1', employee_id: 'u21', order_date: '2026-06-22', order_value: 285000, customer_name: 'Reliance Industries',  status: 'confirmed',  created_at: '2026-06-22T10:00:00Z' },
+  { id: 'eqb2',  branch_id: 'b1', employee_id: 'u21', order_date: '2026-06-22', order_value: 142000, customer_name: 'Tata Consultancy',      status: 'generated',  created_at: '2026-06-22T11:30:00Z' },
+  { id: 'eqb3',  branch_id: 'b1', employee_id: 'u24', order_date: '2026-06-21', order_value: 375000, customer_name: 'Infosys Ltd',           status: 'confirmed',  created_at: '2026-06-21T09:00:00Z' },
+  { id: 'eqb4',  branch_id: 'b2', employee_id: 'u26', order_date: '2026-06-22', order_value: 195000, customer_name: 'HCL Technologies',      status: 'confirmed',  created_at: '2026-06-22T10:00:00Z' },
+  { id: 'eqb5',  branch_id: 'b2', employee_id: 'u26', order_date: '2026-06-21', order_value: 88000,  customer_name: 'Wipro Ltd',             status: 'generated',  created_at: '2026-06-21T14:00:00Z' },
+  { id: 'eqb6',  branch_id: 'b3', employee_id: 'u22', order_date: '2026-06-22', order_value: 220000, customer_name: 'Cognizant Technology',  status: 'confirmed',  created_at: '2026-06-22T09:00:00Z' },
+  { id: 'eqb7',  branch_id: 'b3', employee_id: 'u22', order_date: '2026-06-22', order_value: 155000, customer_name: 'L&T Technology',        status: 'generated',  created_at: '2026-06-22T15:00:00Z' },
+  { id: 'eqb8',  branch_id: 'b3', employee_id: 'u22', order_date: '2026-06-21', order_value: 312000, customer_name: 'Hexaware Technologies', status: 'confirmed',  created_at: '2026-06-21T11:00:00Z' },
+  { id: 'eqb9',  branch_id: 'b4', employee_id: 'u25', order_date: '2026-06-22', order_value: 430000, customer_name: 'Flipkart Logistics',    status: 'confirmed',  created_at: '2026-06-22T10:00:00Z' },
+  { id: 'eqb10', branch_id: 'b4', employee_id: 'u25', order_date: '2026-06-22', order_value: 267000, customer_name: 'Amazon India',          status: 'generated',  created_at: '2026-06-22T12:00:00Z' },
+  { id: 'eqb11', branch_id: 'b4', employee_id: 'u25', order_date: '2026-06-21', order_value: 189000, customer_name: 'Meesho Supply Chain',   status: 'confirmed',  created_at: '2026-06-21T10:00:00Z' },
+  { id: 'eqb12', branch_id: 'b5', employee_id: 'u17', order_date: '2026-06-22', order_value: 175000, customer_name: 'DrReddy Laboratories', status: 'confirmed',  created_at: '2026-06-22T09:30:00Z' },
+  { id: 'eqb13', branch_id: 'b5', employee_id: 'u17', order_date: '2026-06-21', order_value: 98000,  customer_name: 'Sun Pharma',            status: 'cancelled',  created_at: '2026-06-21T16:00:00Z' },
+  { id: 'eqb14', branch_id: 'b6', employee_id: 'u19', order_date: '2026-06-22', order_value: 130000, customer_name: 'Britannia Industries',  status: 'generated',  created_at: '2026-06-22T11:00:00Z' },
+  { id: 'eqb15', branch_id: 'b6', employee_id: 'u19', order_date: '2026-06-21', order_value: 87000,  customer_name: 'ITC Limited',           status: 'confirmed',  created_at: '2026-06-21T13:00:00Z' },
+]
+
+// ─── Unbilled Reports ─────────────────────────────────────────────────────────
+export const UNBILLED_REPORTS: UnbilledReport[] = [
+  { id: 'ub1', branch_id: 'b1', employee_id: 'u20', report_date: '2026-06-22', pending_pos: 8,  pending_po_value: 680000,  completed_jobs_not_billed: 12, unbilled_job_value: 1150000, damages_pending: 3, damage_value: 95000,  billed_jobs: 45, total_completed_jobs: 57, resolved_damages: 6,  closed_pos: 22, remarks: null, created_at: '2026-06-22T18:00:00Z' },
+  { id: 'ub2', branch_id: 'b2', employee_id: 'u26', report_date: '2026-06-22', pending_pos: 5,  pending_po_value: 420000,  completed_jobs_not_billed: 7,  unbilled_job_value: 640000,  damages_pending: 2, damage_value: 48000,  billed_jobs: 38, total_completed_jobs: 45, resolved_damages: 5,  closed_pos: 18, remarks: 'One PO pending legal sign-off.', created_at: '2026-06-22T18:00:00Z' },
+  { id: 'ub3', branch_id: 'b3', employee_id: 'u22', report_date: '2026-06-22', pending_pos: 12, pending_po_value: 980000,  completed_jobs_not_billed: 18, unbilled_job_value: 1820000, damages_pending: 5, damage_value: 185000, billed_jobs: 32, total_completed_jobs: 50, resolved_damages: 4,  closed_pos: 14, remarks: 'High unbilled exposure — escalation recommended.', created_at: '2026-06-22T18:00:00Z' },
+  { id: 'ub4', branch_id: 'b4', employee_id: 'u25', report_date: '2026-06-22', pending_pos: 4,  pending_po_value: 310000,  completed_jobs_not_billed: 5,  unbilled_job_value: 480000,  damages_pending: 1, damage_value: 22000,  billed_jobs: 51, total_completed_jobs: 56, resolved_damages: 8,  closed_pos: 24, remarks: null, created_at: '2026-06-22T18:00:00Z' },
+  { id: 'ub5', branch_id: 'b5', employee_id: 'u17', report_date: '2026-06-22', pending_pos: 6,  pending_po_value: 510000,  completed_jobs_not_billed: 9,  unbilled_job_value: 870000,  damages_pending: 3, damage_value: 72000,  billed_jobs: 29, total_completed_jobs: 38, resolved_damages: 3,  closed_pos: 12, remarks: null, created_at: '2026-06-22T18:00:00Z' },
+  { id: 'ub6', branch_id: 'b6', employee_id: 'u19', report_date: '2026-06-22', pending_pos: 3,  pending_po_value: 195000,  completed_jobs_not_billed: 4,  unbilled_job_value: 340000,  damages_pending: 1, damage_value: 15000,  billed_jobs: 22, total_completed_jobs: 26, resolved_damages: 2,  closed_pos: 9,  remarks: null, created_at: '2026-06-22T18:00:00Z' },
+]
+
+// ─── DPR (Daily Performance Reports) ─────────────────────────────────────────
+export const DPR_REPORTS: DailyPerformanceReport[] = [
+  // Today (2026-06-22)
+  { id: 'dpr1',  branch_id: 'b1', submitted_by: 'u20', report_date: '2026-06-22', daily_revenue: 2850000, jobs_completed: 28, jobs_open: 14, jobs_delayed: 3, pending_billing: 1150000, pending_damage_claims: 95000,  customer_followups: 42, challenges: null, created_at: '2026-06-22T18:30:00Z' },
+  { id: 'dpr2',  branch_id: 'b2', submitted_by: 'u26', report_date: '2026-06-22', daily_revenue: 1940000, jobs_completed: 21, jobs_open: 9,  jobs_delayed: 2, pending_billing: 640000,  pending_damage_claims: 48000,  customer_followups: 31, challenges: null, created_at: '2026-06-22T18:00:00Z' },
+  { id: 'dpr3',  branch_id: 'b3', submitted_by: 'u22', report_date: '2026-06-22', daily_revenue: 1620000, jobs_completed: 18, jobs_open: 11, jobs_delayed: 5, pending_billing: 1820000, pending_damage_claims: 185000, customer_followups: 24, challenges: 'High pending billing and damage claims; need finance team review.', created_at: '2026-06-22T18:00:00Z' },
+  { id: 'dpr4',  branch_id: 'b4', submitted_by: 'u25', report_date: '2026-06-22', daily_revenue: 2480000, jobs_completed: 26, jobs_open: 8,  jobs_delayed: 1, pending_billing: 480000,  pending_damage_claims: 22000,  customer_followups: 38, challenges: null, created_at: '2026-06-22T18:00:00Z' },
+  { id: 'dpr5',  branch_id: 'b5', submitted_by: 'u17', report_date: '2026-06-22', daily_revenue: 1380000, jobs_completed: 15, jobs_open: 7,  jobs_delayed: 2, pending_billing: 870000,  pending_damage_claims: 72000,  customer_followups: 22, challenges: null, created_at: '2026-06-22T18:00:00Z' },
+  { id: 'dpr6',  branch_id: 'b6', submitted_by: 'u19', report_date: '2026-06-22', daily_revenue: 980000,  jobs_completed: 11, jobs_open: 5,  jobs_delayed: 1, pending_billing: 340000,  pending_damage_claims: 15000,  customer_followups: 16, challenges: null, created_at: '2026-06-22T18:00:00Z' },
+  // Yesterday (2026-06-21)
+  { id: 'dpr7',  branch_id: 'b1', submitted_by: 'u20', report_date: '2026-06-21', daily_revenue: 2640000, jobs_completed: 25, jobs_open: 16, jobs_delayed: 2, pending_billing: 1050000, pending_damage_claims: 80000,  customer_followups: 38, challenges: null, created_at: '2026-06-21T18:30:00Z' },
+  { id: 'dpr8',  branch_id: 'b2', submitted_by: 'u26', report_date: '2026-06-21', daily_revenue: 1820000, jobs_completed: 19, jobs_open: 10, jobs_delayed: 3, pending_billing: 580000,  pending_damage_claims: 55000,  customer_followups: 28, challenges: null, created_at: '2026-06-21T18:00:00Z' },
+  { id: 'dpr9',  branch_id: 'b3', submitted_by: 'u22', report_date: '2026-06-21', daily_revenue: 1510000, jobs_completed: 16, jobs_open: 12, jobs_delayed: 4, pending_billing: 1620000, pending_damage_claims: 160000, customer_followups: 20, challenges: null, created_at: '2026-06-21T18:00:00Z' },
+  { id: 'dpr10', branch_id: 'b4', submitted_by: 'u25', report_date: '2026-06-21', daily_revenue: 2310000, jobs_completed: 24, jobs_open: 9,  jobs_delayed: 2, pending_billing: 520000,  pending_damage_claims: 28000,  customer_followups: 35, challenges: null, created_at: '2026-06-21T18:00:00Z' },
+  { id: 'dpr11', branch_id: 'b5', submitted_by: 'u17', report_date: '2026-06-21', daily_revenue: 1290000, jobs_completed: 13, jobs_open: 8,  jobs_delayed: 2, pending_billing: 790000,  pending_damage_claims: 68000,  customer_followups: 19, challenges: null, created_at: '2026-06-21T18:00:00Z' },
+  { id: 'dpr12', branch_id: 'b6', submitted_by: 'u19', report_date: '2026-06-21', daily_revenue: 890000,  jobs_completed: 9,  jobs_open: 6,  jobs_delayed: 1, pending_billing: 310000,  pending_damage_claims: 12000,  customer_followups: 14, challenges: null, created_at: '2026-06-21T18:00:00Z' },
+]
+
+// Helper lookups for new data
+export const branchById     = (id: string) => BRANCHES.find((b) => b.id === id)
+export const cscReportsByEmployee = (uid: string) => CSC_REPORTS.filter((r) => r.employee_id === uid)
+export const cetReportsByEmployee = (uid: string) => CET_REPORTS.filter((r) => r.employee_id === uid)
+export const dprByBranch    = (bid: string) => DPR_REPORTS.filter((r) => r.branch_id === bid)
+export const dprToday       = () => DPR_REPORTS.filter((r) => r.report_date === '2026-06-22')

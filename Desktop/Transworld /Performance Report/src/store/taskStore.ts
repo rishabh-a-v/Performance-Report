@@ -13,6 +13,7 @@ interface TaskStore {
   updateValue: (taskId: string, currentValue: number) => void
   // milestone model
   toggleMilestone: (milestoneId: string) => void
+  deleteMilestone: (milestoneId: string) => void
   addMilestones: (newMilestones: Milestone[]) => void
   getMilestonesForTask: (taskId: string) => Milestone[]
   // generic
@@ -40,10 +41,20 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     const delta = completedQuantity - (task.completed_quantity ?? 0)
     const today = new Date().toISOString().slice(0, 10)
 
+    const now = new Date().toISOString()
+    const isComplete = completedQuantity >= task.target_quantity
+
     set((state) => {
       const tasks = state.tasks.map((t) =>
         t.id === taskId
-          ? { ...t, completed_quantity: completedQuantity, updated_at: new Date().toISOString() }
+          ? {
+              ...t,
+              completed_quantity: completedQuantity,
+              updated_at: now,
+              ...(isComplete && t.status !== 'done'
+                ? { status: 'done' as const, completed_at: now }
+                : {}),
+            }
           : t,
       )
       const existingIdx = state.history.findIndex(
@@ -66,7 +77,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
             completed_quantity: completedQuantity,
             progress_percentage,
             daily_delta: Math.max(0, delta),
-            created_at: new Date().toISOString(),
+            created_at: now,
           },
         ]
       }
@@ -77,27 +88,79 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   updateValue: (taskId, currentValue) => {
     const task = get().tasks.find((t) => t.id === taskId)
     if (!task?.target_value) return
+    const now = new Date().toISOString()
+    const isComplete = currentValue >= task.target_value
     set((state) => ({
       tasks: state.tasks.map((t) =>
         t.id === taskId
-          ? { ...t, current_value: currentValue, updated_at: new Date().toISOString() }
+          ? {
+              ...t,
+              current_value: currentValue,
+              updated_at: now,
+              ...(isComplete && t.status !== 'done'
+                ? { status: 'done' as const, completed_at: now }
+                : {}),
+            }
           : t,
       ),
     }))
   },
 
   toggleMilestone: (milestoneId) => {
-    set((state) => ({
-      milestones: state.milestones.map((m) =>
+    const milestone = get().milestones.find((m) => m.id === milestoneId)
+    if (!milestone) return
+    const now = new Date().toISOString()
+    const becomingComplete = !milestone.completed
+
+    set((state) => {
+      const milestones = state.milestones.map((m) =>
         m.id === milestoneId
-          ? {
-              ...m,
-              completed: !m.completed,
-              completed_at: !m.completed ? new Date().toISOString() : null,
-            }
+          ? { ...m, completed: becomingComplete, completed_at: becomingComplete ? now : null }
           : m,
-      ),
-    }))
+      )
+      // Auto-complete parent task when all milestones are done
+      const taskMilestones = milestones.filter((m) => m.task_id === milestone.task_id)
+      const allDone = taskMilestones.length > 0 && taskMilestones.every((m) => m.completed)
+      const tasks = state.tasks.map((t) =>
+        t.id === milestone.task_id
+          ? {
+              ...t,
+              updated_at: now,
+              ...(allDone && t.status !== 'done'
+                ? { status: 'done' as const, completed_at: now }
+                : !allDone && t.status === 'done'
+                ? { status: 'in_progress' as const, completed_at: null }
+                : {}),
+            }
+          : t,
+      )
+      return { milestones, tasks }
+    })
+  },
+
+  deleteMilestone: (milestoneId) => {
+    const milestone = get().milestones.find((m) => m.id === milestoneId)
+    if (!milestone) return
+    const now = new Date().toISOString()
+    set((state) => {
+      const milestones = state.milestones.filter((m) => m.id !== milestoneId)
+      const taskMilestones = milestones.filter((m) => m.task_id === milestone.task_id)
+      const allDone = taskMilestones.length > 0 && taskMilestones.every((m) => m.completed)
+      const tasks = state.tasks.map((t) =>
+        t.id === milestone.task_id
+          ? {
+              ...t,
+              updated_at: now,
+              ...(allDone && t.status !== 'done'
+                ? { status: 'done' as const, completed_at: now }
+                : !allDone && t.status === 'done'
+                ? { status: 'in_progress' as const, completed_at: null }
+                : {}),
+            }
+          : t,
+      )
+      return { milestones, tasks }
+    })
   },
 
   addMilestones: (newMilestones) => {

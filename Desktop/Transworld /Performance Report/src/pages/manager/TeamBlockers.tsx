@@ -25,7 +25,7 @@ export function TeamBlockers() {
   )
 
   // Dept heads / execs see all
-  const seeAll = user.role === 'department_head' || user.role === 'executive'
+  const seeAll = user.role === 'director' || user.role === 'managing_director'
 
   const active   = blockers.filter((b) => !b.resolved_at && (seeAll || myReporteeIds.has(b.employee_id)))
   const resolved = blockers.filter((b) =>  b.resolved_at && (seeAll || myReporteeIds.has(b.employee_id)))

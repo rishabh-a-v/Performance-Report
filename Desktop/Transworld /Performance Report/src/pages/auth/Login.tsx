@@ -11,7 +11,7 @@ export function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  if (isAuthenticated) return <Navigate to="/my-work" replace />
+  if (isAuthenticated) return <Navigate to="/tasks" replace />
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

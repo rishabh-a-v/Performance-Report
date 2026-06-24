@@ -1,10 +1,9 @@
-import { Bell, Search, Menu, HelpCircle } from 'lucide-react'
+import { Bell, Menu } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Avatar } from '@/components/ui/Avatar'
 
 interface TopBarProps {
   title: string
-  subtitle?: string
   onMenuClick?: () => void
 }
 
@@ -14,24 +13,9 @@ export function TopBar({ title, onMenuClick }: TopBarProps) {
 
   // Format breadcrumbs based on active page title
   const getBreadcrumbs = () => {
-    if (title === 'My Work') {
-      return (
-        <div className="flex items-center gap-1.5 text-xs text-slate-400">
-          <span className="font-semibold text-slate-500">Transworld</span>
-          <span>/</span>
-          <span className="flex items-center gap-1 font-medium text-slate-700">
-            <span className="text-[10px]">㗊</span> WeCraft
-          </span>
-        </div>
-      )
-    }
     return (
       <div className="flex items-center gap-1.5 text-xs text-slate-400">
         <span className="font-semibold text-slate-500">Transworld</span>
-        <span>/</span>
-        <span className="flex items-center gap-1 text-slate-500">
-          <span className="text-[10px]">㗊</span> WeCraft
-        </span>
         <span>/</span>
         <span className="font-medium text-slate-700">{title}</span>
       </div>

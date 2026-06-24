@@ -15,7 +15,7 @@ interface AuthContextValue extends AuthState {
   can: (minRole: UserRole) => boolean
 }
 
-const ROLE_ORDER: UserRole[] = ['employee', 'manager', 'department_head', 'executive']
+const ROLE_ORDER: UserRole[] = ['executive', 'manager', 'director', 'managing_director']
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 

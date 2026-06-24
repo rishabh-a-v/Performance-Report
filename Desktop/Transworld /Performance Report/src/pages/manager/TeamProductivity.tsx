@@ -1,85 +1,95 @@
 import { useState, useMemo } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Card } from '@/components/ui/Card'
 import { KPICard } from '@/components/ui/KPICard'
 import { Avatar } from '@/components/ui/Avatar'
-import { ProgressBar } from '@/components/ui/ProgressBar'
-import { TaskProgressDrawer } from '@/components/tasks/TaskProgressDrawer'
-import { TaskCreateModal } from '@/components/tasks/TaskCreateModal'
-import { useTaskStore } from '@/store/taskStore'
+import { useJobDirectionStore } from '@/store/jobDirectionStore'
 import { PROFILES, DEPARTMENTS, reportees } from '@/lib/mockData'
-import {
-  calcForecast, progressPct,
-  formatQuantity, isMeasurable, progressSummary, isMilestone, isValue,
-} from '@/lib/kpiEngine'
+import { formatCurrency } from '@/lib/kpiEngine'
 import { cn } from '@/lib/utils'
-import type { Task } from '@/types/database'
+import type { JobDirectionStatus } from '@/types/database'
 import {
-  Target, TrendingUp, AlertTriangle, CheckCircle2, Plus,
-  ArrowUpDown, Filter,
+  TrendingUp, AlertTriangle, CheckCircle2,
+  ArrowUpDown, Filter, Compass,
 } from 'lucide-react'
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend,
-} from 'recharts'
+import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
+import type { JobDirection } from '@/types/database'
 
-type SortKey = 'pct' | 'remaining' | 'due'
+type SortKey = 'progress' | 'due' | 'employee'
 type SortDir = 'asc' | 'desc'
 
-const CHART_COLORS = ['#5568f5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899']
+const JD_STATUS_STYLE: Record<JobDirectionStatus, string> = {
+  draft:     'bg-slate-100 text-slate-500',
+  active:    'bg-blue-100 text-blue-700',
+  submitted: 'bg-amber-100 text-amber-700',
+  approved:  'bg-emerald-100 text-emerald-700',
+  rejected:  'bg-red-100 text-red-700',
+  completed: 'bg-slate-100 text-slate-600',
+}
+
+const JD_STATUS_LABEL: Record<JobDirectionStatus, string> = {
+  draft:     'Draft',
+  active:    'Active',
+  submitted: 'Under Review',
+  approved:  'Approved',
+  rejected:  'Changes Needed',
+  completed: 'Completed',
+}
+
+const JD_BAR_COLOUR: Record<JobDirectionStatus, string> = {
+  draft:     'bg-slate-300',
+  active:    'bg-blue-500',
+  submitted: 'bg-amber-400',
+  approved:  'bg-emerald-500',
+  rejected:  'bg-red-400',
+  completed: 'bg-emerald-600',
+}
 
 export function TeamProductivity() {
   const { user } = useAuth()
-  const { tasks, milestones, getHistoryForTask } = useTaskStore()
+  const allJDs = useJobDirectionStore((s) => s.directions)
 
-  const [deptFilter, setDeptFilter]   = useState('all')
-  const [sortKey, setSortKey]         = useState<SortKey>('pct')
-  const [sortDir, setSortDir]         = useState<SortDir>('asc')
-  const [updateTask, setUpdateTask]   = useState<Task | null>(null)
-  const [showCreate, setShowCreate]   = useState(false)
+  const [deptFilter, setDeptFilter] = useState('all')
+  const [sortKey, setSortKey]       = useState<SortKey>('progress')
+  const [sortDir, setSortDir]       = useState<SortDir>('asc')
+  const [selectedDetail, setSelectedDetail] = useState<{ kind: 'jd'; data: JobDirection } | null>(null)
 
   if (!user) return null
 
-  // Build member list (team = user's direct reports + self for managers)
+  const canSeeAll = user.role === 'director' || user.role === 'managing_director'
   const team = reportees(user.id)
-  const memberIds = team.map((m) => m.id)
+  const teamIds = team.map((m) => m.id)
 
-  // All measurable tasks across team (and all if dept head/exec)
-  const canSeeAll = user.role === 'department_head' || user.role === 'executive'
-  const measurable = tasks.filter((t) =>
-    isMeasurable(t) && (canSeeAll || memberIds.includes(t.assignee_id)),
+  const today = new Date().toISOString().slice(0, 10)
+
+  const activeStatuses: JobDirectionStatus[] = ['active', 'submitted', 'approved', 'rejected']
+  const teamJDs = allJDs.filter((jd) =>
+    activeStatuses.includes(jd.status) &&
+    (canSeeAll || teamIds.includes(jd.employee_id))
   )
 
-  // Apply dept filter
   const deptFiltered = deptFilter === 'all'
-    ? measurable
-    : measurable.filter((t) => t.department_id === deptFilter)
+    ? teamJDs
+    : teamJDs.filter((jd) => {
+        const emp = PROFILES.find((p) => p.id === jd.employee_id)
+        return emp?.department_id === deptFilter
+      })
 
-  // Compute row data
   const rows = useMemo(() => {
-    return deptFiltered.map((task) => {
-      const pct       = progressPct(task, milestones)
-      const forecast  = calcForecast(task, milestones)
-      const assignee  = PROFILES.find((p) => p.id === task.assignee_id)
-      const dept      = DEPARTMENTS.find((d) => d.id === task.department_id)
-      const throughput = forecast?.dailyThroughput ?? 0
-      const remaining = isMilestone(task)
-        ? milestones.filter((m) => m.task_id === task.id && !m.completed).length
-        : isValue(task)
-          ? (task.target_value ?? 0) - (task.current_value ?? 0)
-          : (task.target_quantity ?? 0) - (task.completed_quantity ?? 0)
-      const dueMs     = task.due_date ? new Date(task.due_date).getTime() : Infinity
-      return { task, pct, forecast, assignee, dept, throughput, remaining, dueMs }
+    return deptFiltered.map((jd) => {
+      const assignee = PROFILES.find((p) => p.id === jd.employee_id)
+      const isOverdue = jd.due_date ? jd.due_date < today : false
+      const dueMs     = jd.due_date ? new Date(jd.due_date).getTime() : Infinity
+      return { jd, assignee, isOverdue, dueMs }
     })
-  }, [deptFiltered, milestones])
+  }, [deptFiltered, today])
 
-  // Sort
   const sorted = useMemo(() => {
     return [...rows].sort((a, b) => {
       let diff = 0
-      if (sortKey === 'pct')        diff = a.pct - b.pct
-      if (sortKey === 'remaining')  diff = a.remaining - b.remaining
-      if (sortKey === 'due')        diff = a.dueMs - b.dueMs
+      if (sortKey === 'progress') diff = a.jd.progress_percentage - b.jd.progress_percentage
+      if (sortKey === 'due')      diff = a.dueMs - b.dueMs
+      if (sortKey === 'employee') diff = (a.assignee?.full_name ?? '').localeCompare(b.assignee?.full_name ?? '')
       return sortDir === 'asc' ? diff : -diff
     })
   }, [rows, sortKey, sortDir])
@@ -89,25 +99,11 @@ export function TeamProductivity() {
     else { setSortKey(key); setSortDir('asc') }
   }
 
-  // Aggregate KPIs
-  const onTrack  = rows.filter((r) => r.forecast?.isOnTrack).length
-  const atRisk   = rows.filter((r) => r.forecast?.isAtRisk).length
-  const behind   = rows.filter((r) => r.forecast?.isBehind).length
-  const avgPct   = rows.length ? Math.round(rows.reduce((s, r) => s + r.pct, 0) / rows.length) : 0
-
-  // Throughput trend data for top 3 tasks by target quantity
-  const topTasks = [...measurable].sort((a, b) => (b.target_quantity ?? 0) - (a.target_quantity ?? 0)).slice(0, 3)
-  const trendMap: Record<string, Record<string, number>> = {}
-  topTasks.forEach((t) => {
-    getHistoryForTask(t.id).forEach((h) => {
-      if (!trendMap[h.recorded_date]) trendMap[h.recorded_date] = { date: h.recorded_date as unknown as number }
-      const label = t.title.length > 20 ? t.title.slice(0, 20) + '…' : t.title
-      trendMap[h.recorded_date][label] = h.progress_percentage
-    })
-  })
-  const trendData = Object.values(trendMap).sort((a, b) =>
-    String(a.date).localeCompare(String(b.date)),
-  ).map((row) => ({ ...row, date: String(row.date).slice(5) }))
+  const avgProgress = rows.length
+    ? Math.round(rows.reduce((s, r) => s + r.jd.progress_percentage, 0) / rows.length)
+    : 0
+  const onTrack = rows.filter((r) => !r.isOverdue && r.jd.status !== 'rejected').length
+  const atRisk  = rows.filter((r) => r.isOverdue || r.jd.status === 'rejected').length
 
   function SortButton({ k, label }: { k: SortKey; label: string }) {
     return (
@@ -126,66 +122,20 @@ export function TeamProductivity() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-slate-900">Team Productivity</h2>
-          <p className="text-xs text-slate-400 mt-0.5">Outcome-based progress across all measurable tasks</p>
-        </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-700 shadow-sm"
-        >
-          <Plus size={13} />
-          New Task
-        </button>
+      <div>
+        <h2 className="text-lg font-bold text-slate-900">Team Productivity</h2>
+        <p className="text-xs text-slate-400 mt-0.5">Job Direction progress across all active team members</p>
       </div>
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <KPICard title="Measurable Tasks" value={measurable.length} icon={Target} iconColor="text-brand-600" />
-        <KPICard title="Avg Progress"     value={`${avgPct}%`}      icon={TrendingUp}    iconColor="text-emerald-600" />
-        <KPICard title="On Track"         value={onTrack}            icon={CheckCircle2}  iconColor="text-emerald-600" />
-        <KPICard title="At Risk / Behind" value={atRisk + behind}    icon={AlertTriangle} iconColor="text-red-500" invertDelta />
+        <KPICard title="Active Job Directions" value={teamJDs.length}    icon={Compass}       iconColor="text-brand-600" />
+        <KPICard title="Avg Progress"          value={`${avgProgress}%`} icon={TrendingUp}    iconColor="text-emerald-600" />
+        <KPICard title="On Track"              value={onTrack}           icon={CheckCircle2}  iconColor="text-emerald-600" />
+        <KPICard title="At Risk"               value={atRisk}            icon={AlertTriangle} iconColor="text-red-500" invertDelta />
       </div>
 
-      {/* Progress trend chart */}
-      {trendData.length > 1 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Progress Trend — Top Tasks</CardTitle>
-          </CardHeader>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData} margin={{ top: 4, right: 16, bottom: 0, left: -8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} domain={[0, 100]} unit="%" />
-                <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
-                  formatter={(v: number) => [`${v.toFixed(1)}%`]}
-                />
-                <Legend iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                {topTasks.map((t, i) => {
-                  const label = t.title.length > 20 ? t.title.slice(0, 20) + '…' : t.title
-                  return (
-                    <Line
-                      key={t.id}
-                      type="monotone"
-                      dataKey={label}
-                      stroke={CHART_COLORS[i % CHART_COLORS.length]}
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                      connectNulls
-                    />
-                  )
-                })}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      )}
-
-      {/* Filters */}
+      {/* Dept filter */}
       <div className="flex items-center gap-3 flex-wrap">
         <Filter size={13} className="text-slate-400" />
         <span className="text-xs text-slate-500 font-medium">Department:</span>
@@ -211,28 +161,29 @@ export function TeamProductivity() {
           <table className="w-full min-w-[700px]">
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-100">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Assignee</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Task</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Summary</th>
-                <th className="px-4 py-3 text-left">
-                  <SortButton k="pct" label="Progress" />
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortButton k="due" label="Due" />
-                </th>
-                <th className="px-4 py-3" />
+                <th className="px-4 py-3 text-left"><SortButton k="employee" label="Employee" /></th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Job Direction</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Type</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Value</th>
+                <th className="px-4 py-3 text-left"><SortButton k="progress" label="Progress" /></th>
+                <th className="px-4 py-3 text-left"><SortButton k="due" label="Due" /></th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Status</th>
               </tr>
             </thead>
             <tbody>
               {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-sm text-slate-400">
-                    No measurable tasks for this filter.
+                  <td colSpan={7} className="py-12 text-center text-sm text-slate-400">
+                    No active job directions for this filter.
                   </td>
                 </tr>
               ) : (
-                sorted.map(({ task, pct, forecast, assignee, remaining }) => (
-                  <tr key={task.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
+                sorted.map(({ jd, assignee, isOverdue }) => (
+                  <tr 
+                    key={jd.id} 
+                    onClick={() => setSelectedDetail({ kind: 'jd', data: jd })}
+                    className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors cursor-pointer"
+                  >
                     <td className="px-4 py-3">
                       {assignee ? (
                         <div className="flex items-center gap-2.5">
@@ -244,33 +195,59 @@ export function TeamProductivity() {
                         </div>
                       ) : <span className="text-xs text-slate-400">—</span>}
                     </td>
+
                     <td className="px-4 py-3 max-w-[180px]">
-                      <p className="text-sm font-medium text-slate-900 line-clamp-1">{task.title}</p>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-400 tabular-nums whitespace-nowrap">
-                      {progressSummary(task, milestones)}
-                    </td>
-                    <td className="px-4 py-3 min-w-[140px]">
-                      <ProgressBar value={pct} size="sm" className="mb-1" />
-                      {!isMilestone(task) && (
-                        <p className="text-xs text-slate-500 tabular-nums">
-                          {typeof remaining === 'number' ? formatQuantity(Math.max(0, remaining)) : remaining} left
-                        </p>
+                      <p className="text-sm font-medium text-slate-900 line-clamp-1">{jd.title}</p>
+                      {jd.description && (
+                        <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{jd.description}</p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
-                      {task.due_date
-                        ? new Date(task.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-                        : '—'
-                      }
-                    </td>
+
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => setUpdateTask(task)}
-                        className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-700 transition-colors"
-                      >
-                        Update
-                      </button>
+                      <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded capitalize">
+                        {jd.progress_type}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-3 text-xs text-slate-500 tabular-nums whitespace-nowrap">
+                      {jd.progress_type === 'milestone'
+                        ? `${jd.progress_percentage.toFixed(0)}% done`
+                        : jd.current_value != null && jd.target_value != null
+                          ? jd.unit === 'INR'
+                            ? `${formatCurrency(jd.current_value, 'INR')} / ${formatCurrency(jd.target_value, 'INR')}`
+                            : `${jd.current_value} / ${jd.target_value} ${jd.unit ?? ''}`
+                          : '—'}
+                    </td>
+
+                    <td className="px-4 py-3 min-w-[140px]">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                          <div
+                            className={cn('h-full rounded-full transition-all', JD_BAR_COLOUR[jd.status])}
+                            style={{ width: `${Math.min(100, jd.progress_percentage)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-semibold text-slate-500 tabular-nums w-9 text-right">
+                          {jd.progress_percentage.toFixed(0)}%
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {jd.due_date ? (
+                        <span className={cn('text-xs font-medium', isOverdue ? 'text-red-600' : 'text-slate-500')}>
+                          {new Date(jd.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                          {isOverdue && <span className="ml-1 text-[10px] text-red-500">overdue</span>}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 text-xs">—</span>
+                      )}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', JD_STATUS_STYLE[jd.status])}>
+                        {JD_STATUS_LABEL[jd.status]}
+                      </span>
                     </td>
                   </tr>
                 ))
@@ -281,21 +258,11 @@ export function TeamProductivity() {
 
         {sorted.length > 0 && (
           <div className="border-t border-slate-100 px-4 py-3 text-xs text-slate-400">
-            {sorted.length} measurable tasks · {onTrack} on track · {atRisk} at risk · {behind} behind
+            {sorted.length} active job directions · {onTrack} on track · {atRisk} at risk
           </div>
         )}
       </Card>
-
-      {updateTask && (
-        <TaskProgressDrawer task={updateTask} onClose={() => setUpdateTask(null)} />
-      )}
-      {showCreate && (
-        <TaskCreateModal
-          currentUserId={user.id}
-          defaultDeptId={user.department_id}
-          onClose={() => setShowCreate(false)}
-        />
-      )}
+      <TaskDetailModal item={selectedDetail} onClose={() => setSelectedDetail(null)} />
     </div>
   )
 }

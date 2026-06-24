@@ -3,42 +3,60 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/Card'
 import { KPICard } from '@/components/ui/KPICard'
 import { Avatar } from '@/components/ui/Avatar'
 import {
-  PROFILES, TASKS, DEPT_SNAPSHOTS,
-  PERF_SNAPSHOTS, DEPARTMENTS, deptById, tasksByDept,
+  PROFILES, DEPARTMENTS, DEPT_SNAPSHOTS, PERF_SNAPSHOTS, deptById,
 } from '@/lib/mockData'
+import { useJobDirectionStore } from '@/store/jobDirectionStore'
+import { useSpecialTaskStore } from '@/store/specialTaskStore'
 import { useBlockerStore } from '@/store/blockerStore'
 import { completionRate, formatRelative, cn } from '@/lib/utils'
-import { Users, CheckSquare, Clock, AlertTriangle, BarChart3 } from 'lucide-react'
+import { Compass, Clock, AlertTriangle, BarChart3 } from 'lucide-react'
 
 export function DepartmentDashboard() {
   const { user } = useAuth()
+  const allJDs = useJobDirectionStore((s) => s.directions)
+  const allSTs = useSpecialTaskStore((s) => s.tasks)
   const { blockers: liveBlockers } = useBlockerStore()
+
   if (!user) return null
-  // Executives can view any department; default to first dept if none assigned
+
   const deptId = user.department_id ?? DEPARTMENTS[0]?.id
   if (!deptId) return null
 
-  const dept      = deptById(deptId)
-  const tasks     = tasksByDept(deptId)
-  const members   = PROFILES.filter((p) => p.department_id === deptId && p.role === 'employee')
-  const snap      = DEPT_SNAPSHOTS.find((s) => s.department_id === deptId)
+  const dept    = deptById(deptId)
+  const members = PROFILES.filter((p) => p.department_id === deptId && p.role === 'executive')
+  const snap    = DEPT_SNAPSHOTS.find((s) => s.department_id === deptId)
   const activeBlockers = liveBlockers.filter((b) => !b.resolved_at && members.some((m) => m.id === b.employee_id))
 
-  const done     = tasks.filter((t) => t.status === 'done').length
-  const active   = tasks.filter((t) => t.status === 'in_progress').length
-  const blocked  = tasks.filter((t) => t.status === 'blocked').length
-  const backlog  = tasks.filter((t) => t.status === 'backlog' || t.status === 'ready').length
-  const rate     = completionRate(done, tasks.length)
+  const memberIds  = members.map((m) => m.id)
+  const deptJDs    = allJDs.filter((jd) => memberIds.includes(jd.employee_id))
+  const deptSTs    = allSTs.filter((st) => memberIds.includes(st.assigned_to))
 
-  // Member performance
+  const activeJDs    = deptJDs.filter((jd) => ['active', 'submitted', 'rejected'].includes(jd.status)).length
+  const completedJDs = deptJDs.filter((jd) => ['completed', 'approved'].includes(jd.status)).length
+  const completedSTs = deptSTs.filter((st) => st.status === 'completed').length
+  const totalItems   = deptJDs.length + deptSTs.length
+  const totalDone    = completedJDs + completedSTs
+  const rate         = completionRate(totalDone, totalItems)
+
   const memberPerf = members.map((m) => {
-    const snap = PERF_SNAPSHOTS.find((s) => s.user_id === m.id)
-    const mt   = tasks.filter((t) => t.assignee_id === m.id)
+    const perfSnap   = PERF_SNAPSHOTS.find((s) => s.user_id === m.id)
+    const mJDs       = deptJDs.filter((jd) => jd.employee_id === m.id)
+    const mSTs       = deptSTs.filter((st) => st.assigned_to === m.id)
+    const mDoneJDs   = mJDs.filter((jd) => ['completed', 'approved'].includes(jd.status)).length
+    const mDoneSTs   = mSTs.filter((st) => st.status === 'completed').length
+    const mTotal     = mJDs.length + mSTs.length
+    const mDone      = mDoneJDs + mDoneSTs
+    const avgJDProg  = mJDs.length
+      ? Math.round(mJDs.reduce((s, jd) => s + jd.progress_percentage, 0) / mJDs.length)
+      : 0
     return {
       member: m,
-      tasks: mt.length,
-      done: mt.filter((t) => t.status === 'done').length,
-      kpi: snap?.kpi_score ?? 70,
+      jds: mJDs.length,
+      sts: mSTs.length,
+      total: mTotal,
+      done: mDone,
+      avgJDProgress: avgJDProg,
+      kpi: perfSnap?.kpi_score ?? 70,
       blocked: liveBlockers.some((b) => b.employee_id === m.id && !b.resolved_at),
     }
   })
@@ -54,10 +72,10 @@ export function DepartmentDashboard() {
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <KPICard title="Active Tasks"   value={active}            icon={CheckSquare}   iconColor="text-blue-600" />
-        <KPICard title="Completion Rate" value={`${rate}%`}      icon={BarChart3}     delta={3.1} iconColor="text-emerald-600" />
-        <KPICard title="Blocked Tasks"   value={blocked}          icon={AlertTriangle} iconColor="text-red-500" invertDelta />
-        <KPICard title="Avg Cycle Time"  value={snap?.avg_cycle_time_hours ? `${snap.avg_cycle_time_hours}h` : '—'} icon={Clock} iconColor="text-amber-600" />
+        <KPICard title="Active Job Dirs."  value={activeJDs}               icon={Compass}       iconColor="text-blue-600" />
+        <KPICard title="Completion Rate"   value={`${rate}%`}              icon={BarChart3}     delta={3.1} iconColor="text-emerald-600" />
+        <KPICard title="Active Blockers"   value={activeBlockers.length}   icon={AlertTriangle} iconColor="text-red-500" invertDelta />
+        <KPICard title="Avg Cycle Time"    value={snap?.avg_cycle_time_hours ? `${snap.avg_cycle_time_hours}h` : '—'} icon={Clock} iconColor="text-amber-600" />
       </div>
 
       {/* Bottleneck analysis */}
@@ -94,20 +112,21 @@ export function DepartmentDashboard() {
           <CardTitle>Member Performance</CardTitle>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[500px]">
+          <table className="w-full min-w-[560px]">
             <thead>
               <tr className="bg-slate-50/80">
-                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Member</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Tasks</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Done</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Rate</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">KPI</th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Status</th>
+                <th className="px-4 py-2.5 text-left   text-xs font-semibold uppercase tracking-wide text-slate-400">Member</th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-slate-400">JDs</th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-slate-400">STs</th>
+                <th className="px-4 py-2.5 text-right  text-xs font-semibold uppercase tracking-wide text-slate-400">Avg JD %</th>
+                <th className="px-4 py-2.5 text-right  text-xs font-semibold uppercase tracking-wide text-slate-400">Rate</th>
+                <th className="px-4 py-2.5 text-right  text-xs font-semibold uppercase tracking-wide text-slate-400">KPI</th>
+                <th className="px-4 py-2.5 text-left   text-xs font-semibold uppercase tracking-wide text-slate-400">Status</th>
               </tr>
             </thead>
             <tbody>
-              {memberPerf.map(({ member, tasks, done, kpi, blocked }) => {
-                const rate = completionRate(done, tasks)
+              {memberPerf.map(({ member, jds, sts, total, done, avgJDProgress, kpi, blocked }) => {
+                const memberRate = completionRate(done, total)
                 return (
                   <tr key={member.id} className="border-t border-slate-100 hover:bg-slate-50/60">
                     <td className="px-4 py-3">
@@ -119,22 +138,43 @@ export function DepartmentDashboard() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-slate-600">{tasks}</td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-emerald-600">{done}</td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={cn('text-sm font-semibold', rate >= 70 ? 'text-emerald-600' : 'text-amber-600')}>{rate}%</span>
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{jds}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">{sts}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className={cn('text-sm font-bold', kpi >= 75 ? 'text-emerald-600' : kpi >= 55 ? 'text-amber-600' : 'text-red-600')}>{kpi}</span>
+                      <span className={cn('text-sm font-semibold', avgJDProgress >= 70 ? 'text-emerald-600' : 'text-amber-600')}>
+                        {avgJDProgress}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={cn('text-sm font-semibold', memberRate >= 70 ? 'text-emerald-600' : 'text-amber-600')}>
+                        {memberRate}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={cn('text-sm font-bold', kpi >= 75 ? 'text-emerald-600' : kpi >= 55 ? 'text-amber-600' : 'text-red-600')}>
+                        {kpi}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium', blocked ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700')}>
+                      <span className={cn(
+                        'rounded-full px-2.5 py-0.5 text-xs font-medium',
+                        blocked ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700',
+                      )}>
                         {blocked ? 'Blocked' : 'On track'}
                       </span>
                     </td>
                   </tr>
                 )
               })}
+              {memberPerf.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-10 text-center text-sm text-slate-400">No members found.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
