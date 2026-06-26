@@ -20,8 +20,9 @@ SET search_path = public
 AS $$
 DECLARE
   v_user_id   UUID;
-  v_temp_pass TEXT := 'ChangeMe@' || floor(random() * 900000 + 100000)::TEXT;
+  v_pass      TEXT;
 BEGIN
+  v_pass := COALESCE(NULLIF(TRIM(p_phone_no), ''), 'ChangeMe123!');
 
   -- 1. Create the auth user via Supabase admin helpers
   --    (SECURITY DEFINER means this runs as the DB owner who has access to auth.users)
@@ -40,8 +41,8 @@ BEGIN
   VALUES (
     gen_random_uuid(),
     p_email,
-    -- bcrypt hash of temp password (Supabase format)
-    crypt(v_temp_pass, gen_salt('bf')),
+    -- bcrypt hash of the password (which is the phone number or ChangeMe123!)
+    crypt(v_pass, gen_salt('bf')),
     NOW(),
     '{"provider":"email","providers":["email"]}'::jsonb,
     jsonb_build_object('full_name', p_name),
@@ -69,6 +70,7 @@ BEGIN
       WHEN 'MD'       THEN 'managing_director'
       WHEN 'Director' THEN 'director'
       WHEN 'EA'       THEN 'executive_assistant'
+      WHEN 'HR'       THEN 'hr'
       WHEN 'Manager'  THEN 'manager'
       ELSE                 'executive'
     END::user_role

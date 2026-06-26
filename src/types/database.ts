@@ -81,7 +81,7 @@ export interface RolePermission {
   updated_at: string
   updated_by: string | null
 }
-export type SpecialTaskStatus = 'Yet to start' | 'In progress' | 'Completed' | 'Cancelled' | 'Acknowledged'
+export type SpecialTaskStatus = 'Yet to start' | 'In progress' | 'Completed' | 'In review'
 
 export interface Department {
   id: string
@@ -121,16 +121,23 @@ export interface JobDirection {
   employee_id: string
   manager_id: string
   department_id: string | null
+  created_at?: string
+  updated_at?: string
 }
 
 export interface SpecialTask {
   id: string
   created_at: string
+  updated_at?: string
   assigned_by: string
   task_name: string
   due_date: string | null
   status: SpecialTaskStatus
   remarks: string | null
+  approval_status?: 'pending' | 'approved' | 'rejected'
+  approval_by?: string | null
+  approval_at?: string | null
+  rejection_note?: string | null
   // joined from task_assignees
   assignees?: Array<{ employee_id: string; assigned_at: string }>
 }

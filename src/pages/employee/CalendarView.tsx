@@ -17,8 +17,7 @@ const ST_PILL: Record<string, string> = {
   'Yet to start': 'bg-slate-100 text-slate-600',
   'In progress':  'bg-blue-50 text-blue-700',
   Completed:    'bg-emerald-50 text-emerald-700 line-through',
-  Cancelled:    'bg-red-50 text-red-600',
-  Acknowledged: 'bg-teal-50 text-teal-700',
+  'In review':   'bg-purple-50 text-purple-700',
 }
 
 type DayItem =
@@ -129,7 +128,7 @@ export function CalendarView() {
                         key={item.data.id}
                         onClick={(e) => {
                           e.stopPropagation()
-                          setSelectedDetail(item as any)
+                          setSelectedDetail(item)
                         }}
                         className={cn(
                           'flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium truncate cursor-pointer hover:opacity-85',
@@ -173,7 +172,7 @@ export function CalendarView() {
                     return (
                       <div 
                         key={item.data.id} 
-                        onClick={() => setSelectedDetail(item as any)}
+                        onClick={() => setSelectedDetail(item)}
                         className="px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer"
                       >
                         <div className="flex items-start gap-2.5">

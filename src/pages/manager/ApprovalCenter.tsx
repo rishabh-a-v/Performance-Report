@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import type { JobDirection, SpecialTask } from '@/types/database'
 
-const ADMIN_ROLES = ['managing_director', 'executive_assistant', 'hr'] as const
+const ADMIN_ROLES: readonly string[] = ['managing_director', 'executive_assistant', 'hr']
 
 export function ApprovalCenter() {
   const { user, role } = useAuth()
@@ -34,21 +34,25 @@ export function ApprovalCenter() {
   const [jdNotes, setJdNotes] = useState('')
 
   // Task action state
-  const [activeTaskAction, setActiveTaskAction] = useState<'acknowledge' | 'revise' | null>(null)
+  const [activeTaskAction, setActiveTaskAction] = useState<'acknowledge' | 'revise' | 'approve_change' | 'reject_change' | null>(null)
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
   const [taskNotes, setTaskNotes] = useState('')
 
   if (!user) return null
 
-  const isAdmin = ADMIN_ROLES.includes(role as any)
+  const isAdmin = ADMIN_ROLES.includes(role ?? '')
 
   // ── JD Approvals ────────────────────────────────────────────────────────────
-  const pendingJDs = directions.filter(
-    (d) => d.manager_id === user.id && d.status === 'submitted'
-  )
-  const historyJDs = directions.filter(
-    (d) => d.manager_id === user.id && ['approved', 'rejected'].includes(d.status)
-  )
+  const pendingJDs = directions.filter((d) => {
+    if (d.status !== 'submitted') return false
+    if (isAdmin) return true
+    return d.manager_id === user.id
+  })
+  const historyJDs = directions.filter((d) => {
+    if (!['active', 'completed', 'approved', 'rejected'].includes(d.status)) return false
+    if (isAdmin) return true
+    return d.manager_id === user.id
+  })
 
   // ── Deletion Requests ────────────────────────────────────────────────────────
   // Visible to: the employee's reporting manager (manager_id) OR MD/EA/HR
@@ -65,29 +69,41 @@ export function ApprovalCenter() {
   }
 
   // ── Task Approvals ───────────────────────────────────────────────────────────
-  // Show completed tasks for:
-  //   - Employees who report directly to the current user (manager_id === user.id)
-  //   - OR if the user is MD / EA / HR → see all completed tasks pending acknowledgement
   const reporteeIds = new Set(profiles.filter((p) => p.manager_id === user.id).map((p) => p.id))
 
+  // Detail changes pending approval (by supervisor or MD/EA)
+  const pendingTaskChanges = tasks.filter((t) => {
+    if (t.approval_status !== 'pending') return false
+    const assigneeIds = t.assignees?.map((a) => a.employee_id) ?? []
+    if (isAdmin) return true
+    return assigneeIds.some((id) => reporteeIds.has(id))
+  })
+
   const pendingTaskApprovals = tasks.filter((t) => {
-    if (t.status !== 'Completed') return false
+    if (t.status !== 'In review') return false
     const assigneeIds = t.assignees?.map((a) => a.employee_id) ?? []
     if (isAdmin) return true
     return assigneeIds.some((id) => reporteeIds.has(id))
   })
 
   const historyTaskApprovals = tasks.filter((t) => {
-    if (t.status !== 'Acknowledged') return false
+    if (t.status !== 'Completed') return false
     const assigneeIds = t.assignees?.map((a) => a.employee_id) ?? []
     if (isAdmin) return true
     return assigneeIds.some((id) => reporteeIds.has(id))
   })
 
   function handleTaskConfirm(taskId: string) {
-    if (!activeTaskAction) return
-    if (activeTaskAction === 'acknowledge') setStatus(taskId, 'Acknowledged')
-    else setStatus(taskId, 'In progress')
+    if (!activeTaskAction || !user) return
+    if (activeTaskAction === 'acknowledge') {
+      setStatus(taskId, 'Completed')
+    } else if (activeTaskAction === 'revise') {
+      setStatus(taskId, 'In progress')
+    } else if (activeTaskAction === 'approve_change') {
+      useSpecialTaskStore.getState().approveTaskDetailChange(taskId, user.id)
+    } else if (activeTaskAction === 'reject_change') {
+      useSpecialTaskStore.getState().rejectTaskDetailChange(taskId, user.id, taskNotes)
+    }
     setActiveTaskAction(null); setActiveTaskId(null); setTaskNotes('')
   }
 
@@ -143,9 +159,9 @@ export function ApprovalCenter() {
           >
             <CheckSquare size={14} />
             Tasks
-            {pendingTaskApprovals.length > 0 && (
+            {pendingTaskApprovals.length + pendingTaskChanges.length > 0 && (
               <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
-                {pendingTaskApprovals.length}
+                {pendingTaskApprovals.length + pendingTaskChanges.length}
               </span>
             )}
           </button>
@@ -195,9 +211,9 @@ export function ApprovalCenter() {
                       </div>
                       <span className={cn(
                         'rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
-                        jd.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                        ['active', 'completed', 'approved'].includes(jd.status) ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
                       )}>
-                        {jd.status}
+                        {['active', 'completed', 'approved'].includes(jd.status) ? 'Approved' : jd.status}
                       </span>
                     </div>
                     <JDDetailBlock jd={jd} />
@@ -256,11 +272,11 @@ export function ApprovalCenter() {
         showHistory ? (
           <Card padding={false}>
             <div className="border-b border-slate-100 p-4">
-              <CardTitle>Task Acknowledgement History</CardTitle>
+              <CardTitle>Task Completion History</CardTitle>
             </div>
             <div className="divide-y divide-slate-100">
               {historyTaskApprovals.length === 0 ? (
-                <div className="py-12 text-center text-sm text-slate-400">No acknowledgement history found.</div>
+                <div className="py-12 text-center text-sm text-slate-400">No task completion history found.</div>
               ) : historyTaskApprovals.map((task) => {
                 const assigneeProfiles = (task.assignees ?? []).map((a) => profiles.find((p) => p.id === a.employee_id)).filter(Boolean)
                 return (
@@ -277,8 +293,8 @@ export function ApprovalCenter() {
                           </div>
                         ))}
                       </div>
-                      <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-700">
-                        Acknowledged
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                        Completed
                       </span>
                     </div>
                     <TaskDetailBlock task={task} />
@@ -288,72 +304,147 @@ export function ApprovalCenter() {
             </div>
           </Card>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {isAdmin && (
               <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-2.5 text-xs text-blue-700 font-medium">
-                As {role?.replace('_', ' ')}, you see completed tasks from all employees.
+                As {role?.replace('_', ' ')}, you see completed tasks and detail changes from all employees.
               </div>
             )}
-            {pendingTaskApprovals.length === 0 ? (
-              <EmptyState icon={<CheckSquare size={32} className="mx-auto opacity-30 mb-2" />} message="No completed tasks pending acknowledgement." />
-            ) : pendingTaskApprovals.map((task) => {
-              const assigneeProfiles = (task.assignees ?? [])
-                .map((a) => profiles.find((p) => p.id === a.employee_id))
-                .filter(Boolean)
-              const assigner = profiles.find((p) => p.id === task.assigned_by)
-              const isEditing = activeTaskId === task.id
 
-              return (
-                <Card key={task.id} className="p-5 space-y-4">
-                  {/* Assignees */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {assigneeProfiles.map((p) => p && (
-                        <div key={p.id} className="flex items-center gap-2">
-                          <Avatar name={p.full_name} size="sm" />
-                          <div>
-                            <p className="text-sm font-semibold text-slate-800">{p.full_name}</p>
-                            <p className="text-[10px] text-slate-400 capitalize">{p.role?.replace('_', ' ')}</p>
-                          </div>
+            {/* Section 1: Task Details Changes Awaiting Approval */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-slate-700">Task Details & New Tasks Awaiting Approval</h3>
+              {pendingTaskChanges.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 py-6 text-center text-xs text-slate-400">
+                  No task detail changes pending approval.
+                </div>
+              ) : (
+                pendingTaskChanges.map((task) => {
+                  const assigneeProfiles = (task.assignees ?? [])
+                    .map((a) => profiles.find((p) => p.id === a.employee_id))
+                    .filter(Boolean)
+                  const isEditing = activeTaskId === task.id && (activeTaskAction === 'approve_change' || activeTaskAction === 'reject_change')
+
+                  return (
+                    <Card key={task.id} className="p-5 space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {assigneeProfiles.map((p) => p && (
+                            <div key={p.id} className="flex items-center gap-2">
+                              <Avatar name={p.full_name} size="sm" />
+                              <div>
+                                <p className="text-sm font-semibold text-slate-800">{p.full_name}</p>
+                                <p className="text-[10px] text-slate-400 capitalize">{p.role?.replace('_', ' ')}</p>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 shrink-0">
-                      Completed
-                    </span>
-                  </div>
+                        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 shrink-0">
+                          Pending Details Approval
+                        </span>
+                      </div>
 
-                  <TaskDetailBlock task={task} assigner={assigner} />
+                      <TaskDetailBlock task={task} />
 
-                  {isEditing && activeTaskAction ? (
-                    <ActionConfirm
-                      action={activeTaskAction === 'acknowledge' ? 'approve' : 'reject'}
-                      notes={taskNotes}
-                      onNotesChange={setTaskNotes}
-                      onCancel={() => { setActiveTaskAction(null); setActiveTaskId(null) }}
-                      onConfirm={() => handleTaskConfirm(task.id)}
-                      approveLabel="Acknowledge"
-                      rejectLabel="Request Revision"
-                    />
-                  ) : (
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={() => { setActiveTaskId(task.id); setActiveTaskAction('revise'); setTaskNotes('') }}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        <XCircle size={14} /> Request Revision
-                      </button>
-                      <button
-                        onClick={() => { setActiveTaskId(task.id); setActiveTaskAction('acknowledge'); setTaskNotes('') }}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
-                      >
-                        <CheckCircle2 size={14} /> Acknowledge
-                      </button>
-                    </div>
-                  )}
-                </Card>
-              )
-            })}
+                      {isEditing && activeTaskAction ? (
+                        <ActionConfirm
+                          action={activeTaskAction === 'approve_change' ? 'approve' : 'reject'}
+                          notes={taskNotes}
+                          onNotesChange={setTaskNotes}
+                          onCancel={() => { setActiveTaskAction(null); setActiveTaskId(null) }}
+                          onConfirm={() => handleTaskConfirm(task.id)}
+                          approveLabel="Approve Changes"
+                          rejectLabel="Request Changes"
+                        />
+                      ) : (
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            onClick={() => { setActiveTaskId(task.id); setActiveTaskAction('reject_change'); setTaskNotes('') }}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            <XCircle size={14} /> Request Changes
+                          </button>
+                          <button
+                            onClick={() => { setActiveTaskId(task.id); setActiveTaskAction('approve_change'); setTaskNotes('') }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+                          >
+                            <CheckCircle2 size={14} /> Approve Details
+                          </button>
+                        </div>
+                      )}
+                    </Card>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Section 2: Tasks Awaiting Review & Completion */}
+            <div className="space-y-3 pt-2">
+              <h3 className="text-sm font-semibold text-slate-700">Tasks Awaiting Review & Completion</h3>
+              {pendingTaskApprovals.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 py-6 text-center text-xs text-slate-400">
+                  No tasks pending review.
+                </div>
+              ) : (
+                pendingTaskApprovals.map((task) => {
+                  const assigneeProfiles = (task.assignees ?? [])
+                    .map((a) => profiles.find((p) => p.id === a.employee_id))
+                    .filter(Boolean)
+                  const assigner = profiles.find((p) => p.id === task.assigned_by)
+                  const isEditing = activeTaskId === task.id && (activeTaskAction === 'acknowledge' || activeTaskAction === 'revise')
+
+                  return (
+                    <Card key={task.id} className="p-5 space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {assigneeProfiles.map((p) => p && (
+                            <div key={p.id} className="flex items-center gap-2">
+                              <Avatar name={p.full_name} size="sm" />
+                              <div>
+                                <p className="text-sm font-semibold text-slate-800">{p.full_name}</p>
+                                <p className="text-[10px] text-slate-400 capitalize">{p.role?.replace('_', ' ')}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-700 shrink-0">
+                          In Review
+                        </span>
+                      </div>
+
+                      <TaskDetailBlock task={task} assigner={assigner} />
+
+                      {isEditing && activeTaskAction ? (
+                        <ActionConfirm
+                          action={activeTaskAction === 'acknowledge' ? 'approve' : 'reject'}
+                          notes={taskNotes}
+                          onNotesChange={setTaskNotes}
+                          onCancel={() => { setActiveTaskAction(null); setActiveTaskId(null) }}
+                          onConfirm={() => handleTaskConfirm(task.id)}
+                          approveLabel="Acknowledge"
+                          rejectLabel="Request Revision"
+                        />
+                      ) : (
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            onClick={() => { setActiveTaskId(task.id); setActiveTaskAction('revise'); setTaskNotes('') }}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            <XCircle size={14} /> Request Revision
+                          </button>
+                          <button
+                            onClick={() => { setActiveTaskId(task.id); setActiveTaskAction('acknowledge'); setTaskNotes('') }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+                          >
+                            <CheckCircle2 size={14} /> Acknowledge
+                          </button>
+                        </div>
+                      )}
+                    </Card>
+                  )
+                })
+              )}
+            </div>
           </div>
         )
       )}

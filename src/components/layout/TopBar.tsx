@@ -3,6 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   Bell, CheckSquare, Clock, X,
   ChevronDown, LogOut, Menu, ShieldCheck,
+  UserPlus, Users,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Avatar } from '@/components/ui/Avatar'
@@ -25,7 +26,7 @@ const ROLE_ORDER: Record<string, number> = {
   executive: 0, executive_assistant: 3, hr: 3, manager: 1, director: 2, managing_director: 3,
 }
 
-const ADMIN_ROLES = ['managing_director', 'executive_assistant', 'hr'] as const
+const ADMIN_ROLES: readonly string[] = ['managing_director', 'executive_assistant', 'hr']
 
 export function TopBar() {
   const { user, role, signOut } = useAuth()
@@ -67,32 +68,100 @@ export function TopBar() {
   const isManager  = roleLevel >= ROLE_ORDER.manager
   const today      = new Date().toISOString().slice(0, 10)
 
-  // ── Badge counts ────────────────────────────────────────────────────────────
-  const pendingJDs       = jobDirections.filter((d) => d.manager_id === user.id && d.status === 'submitted').length
-  const approvalBadge    = pendingJDs
+  // ── Badge counts & lists ───────────────────────────────────────────────────
+  const isAdmin = ADMIN_ROLES.includes(role ?? '')
+  const reporteeIds = new Set(profiles.filter((p) => p.manager_id === user.id).map((p) => p.id))
+
+  // 1. Submitted Job Directions
+  const pendingJDsList = jobDirections.filter((d) => {
+    if (d.status !== 'submitted') return false
+    if (role === 'managing_director' || role === 'executive_assistant') return true
+    return d.manager_id === user.id
+  })
+
+  // 2. Deletion Requests for Job Directions
+  const pendingDeletionsList = jobDirections.filter((d) => {
+    if (d.status !== 'deletion_requested') return false
+    return isAdmin || d.manager_id === user.id
+  })
+
+  // 3. Task detail changes
+  const pendingTaskChangesList = specialTasks.filter((t) => {
+    if (t.approval_status !== 'pending') return false
+    const assigneeIds = t.assignees?.map((a) => a.employee_id) ?? []
+    if (isAdmin) return true
+    return assigneeIds.some((id) => reporteeIds.has(id))
+  })
+
+  // 4. Tasks completed/submitted for review
+  const pendingTaskApprovalsList = specialTasks.filter((t) => {
+    if (t.status !== 'In review') return false
+    const assigneeIds = t.assignees?.map((a) => a.employee_id) ?? []
+    if (isAdmin) return true
+    return assigneeIds.some((id) => reporteeIds.has(id))
+  })
+
+  const approvalBadge = pendingJDsList.length + pendingDeletionsList.length + pendingTaskChangesList.length + pendingTaskApprovalsList.length
 
   // ── Notifications ───────────────────────────────────────────────────────────
   const notifications: NotificationItem[] = []
 
+  // 1. Overdue Tasks (Assignees see their own overdue tasks)
   specialTasks
-    .filter((t) => t.assignees?.some((a) => a.employee_id === user.id) && t.due_date && t.due_date < today && t.status !== 'Completed' && t.status !== 'Cancelled')
+    .filter((t) => t.assignees?.some((a) => a.employee_id === user.id) && t.due_date && t.due_date < today && t.status !== 'Completed')
     .slice(0, 3)
     .forEach((t) => {
       notifications.push({
-        id: `st_${t.id}`, type: 'overdue',
+        id: `st_overdue_${t.id}`, type: 'overdue',
         title: 'Overdue task',
         body: `"${t.task_name}" was due on ${t.due_date}`,
-        time: t.due_date!, read: readIds.has(`st_${t.id}`), path: '/special-tasks',
+        time: t.due_date!, read: readIds.has(`st_overdue_${t.id}`), path: '/special-tasks',
       })
     })
 
-  jobDirections.filter((d) => d.manager_id === user.id && d.status === 'submitted').slice(0, 3).forEach((d) => {
+  // 2. Submitted Job Directions review notifications for manager/MD/EA
+  pendingJDsList.forEach((d) => {
     const emp = profiles.find((p) => p.id === d.employee_id)
     notifications.push({
-      id: `jd_${d.id}`, type: 'jd',
+      id: `jd_review_${d.id}`, type: 'jd',
       title: 'Job Direction needs review',
       body: `${emp?.full_name ?? 'An employee'} submitted "${d.work_details ?? 'Job Direction'}" for review`,
-      time: today, read: readIds.has(`jd_${d.id}`), path: '/approval-center',
+      time: today, read: readIds.has(`jd_review_${d.id}`), path: '/approval-center',
+    })
+  })
+
+  // 3. Deletion requests review notifications for manager/Admin
+  pendingDeletionsList.forEach((d) => {
+    const emp = profiles.find((p) => p.id === d.employee_id)
+    notifications.push({
+      id: `jd_del_${d.id}`, type: 'jd',
+      title: 'Deletion request',
+      body: `${emp?.full_name ?? 'An employee'} requested deletion of "${d.work_details ?? 'Job Direction'}"`,
+      time: today, read: readIds.has(`jd_del_${d.id}`), path: '/approval-center',
+    })
+  })
+
+  // 4. Task detail changes review notifications for manager/Admin
+  pendingTaskChangesList.forEach((t) => {
+    const firstAssigneeId = t.assignees?.[0]?.employee_id
+    const emp = profiles.find((p) => p.id === firstAssigneeId)
+    notifications.push({
+      id: `st_change_${t.id}`, type: 'overdue',
+      title: 'Task details change',
+      body: `${emp?.full_name ?? 'An assignee'} updated details for "${t.task_name}"`,
+      time: t.created_at || today, read: readIds.has(`st_change_${t.id}`), path: '/approval-center',
+    })
+  })
+
+  // 5. Task completion review notifications for manager/Admin
+  pendingTaskApprovalsList.forEach((t) => {
+    const firstAssigneeId = t.assignees?.[0]?.employee_id
+    const emp = profiles.find((p) => p.id === firstAssigneeId)
+    notifications.push({
+      id: `st_review_${t.id}`, type: 'overdue',
+      title: 'Task needs review',
+      body: `${emp?.full_name ?? 'An assignee'} completed task "${t.task_name}"`,
+      time: t.created_at || today, read: readIds.has(`st_review_${t.id}`), path: '/approval-center',
     })
   })
 
@@ -143,7 +212,7 @@ export function TopBar() {
             <img src="/ti-logo.png" alt="TransWorld International" className="h-9 w-auto" />
           </button>
 
-          <nav className="hidden items-center gap-0.5 md:flex">
+          <nav className="hidden items-center gap-0.5 lg:flex">
             <NavLink to="/overview"       className={navLink}>Overview</NavLink>
             <NavLink to="/job-directions" className={navLink}>Job Directions</NavLink>
             <NavLink to="/special-tasks"  className={navLink}>Tasks</NavLink>
@@ -170,8 +239,8 @@ export function TopBar() {
           </nav>
 
             {/* Add Employee + Manage Employees — MD, EA, HR, Director */}
-            {(['managing_director', 'executive_assistant', 'hr', 'director'] as const).includes(role as any) && (
-              <div className="ml-2 hidden md:flex items-center gap-1.5">
+            {(['managing_director', 'executive_assistant', 'hr', 'director'] as readonly string[]).includes(role ?? '') && (
+              <div className="ml-2 hidden xl:flex items-center gap-1.5">
                 <button
                   onClick={() => navigate('/add-employee')}
                   className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-indigo-700 whitespace-nowrap"
@@ -292,7 +361,25 @@ export function TopBar() {
                   <p className="text-xs text-slate-500 mt-0.5">{role.replace('_', ' ')}</p>
                 </div>
                 <div className="py-1">
-                  {ADMIN_ROLES.includes(role as any) && (
+                  {((['managing_director', 'executive_assistant', 'hr', 'director'] as readonly string[]).includes(role ?? '')) && (
+                    <>
+                      <button
+                        onClick={() => { setProfileOpen(false); navigate('/add-employee') }}
+                        className="flex w-full items-center gap-2.5 px-4 py-3 text-[15px] text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <UserPlus size={16} className="shrink-0 text-indigo-500" />
+                        Add Employee
+                      </button>
+                      <button
+                        onClick={() => { setProfileOpen(false); navigate('/manage-employees') }}
+                        className="flex w-full items-center gap-2.5 px-4 py-3 text-[15px] text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <Users size={16} className="shrink-0 text-indigo-500" />
+                        Manage Employees
+                      </button>
+                    </>
+                  )}
+                  {ADMIN_ROLES.includes(role ?? '') && (
                     <button
                       onClick={() => { setProfileOpen(false); navigate('/admin/role-permissions') }}
                       className="flex w-full items-center gap-2.5 px-4 py-3 text-[15px] text-slate-700 hover:bg-slate-50 transition-colors"
@@ -316,7 +403,7 @@ export function TopBar() {
           {/* Mobile menu toggle */}
           <button
             onClick={() => setMobileOpen((v) => !v)}
-            className="ml-1 rounded-lg p-2 text-slate-500 hover:bg-slate-100 md:hidden"
+            className="ml-1 rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden"
           >
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
@@ -325,7 +412,7 @@ export function TopBar() {
 
       {/* ── Mobile nav ─────────────────────────────────────────────────────── */}
       {mobileOpen && (
-        <div className="border-t border-slate-100 bg-white px-4 pb-4 pt-2 md:hidden">
+        <div className="border-t border-slate-100 bg-white px-4 pb-4 pt-2 lg:hidden">
           <nav className="flex flex-col gap-0.5">
             <NavLink to="/overview"       className={navLink}>Overview</NavLink>
             <NavLink to="/job-directions" className={navLink}>Job Directions</NavLink>
@@ -336,7 +423,7 @@ export function TopBar() {
                 Approvals {approvalBadge > 0 && `(${approvalBadge})`}
               </NavLink>
             )}
-            {(['managing_director', 'executive_assistant', 'hr', 'director'] as const).includes(role as any) && (
+            {(['managing_director', 'executive_assistant', 'hr', 'director'] as readonly string[]).includes(role ?? '') && (
               <>
                 <div className="my-1 border-t border-slate-100" />
                 <button
@@ -348,7 +435,7 @@ export function TopBar() {
                 <NavLink to="/manage-employees" className={navLink}>
                   Manage Employees
                 </NavLink>
-                {ADMIN_ROLES.includes(role as any) && (
+                {ADMIN_ROLES.includes(role ?? '') && (
                   <NavLink to="/admin/role-permissions" className={navLink}>
                     Role Permissions
                   </NavLink>

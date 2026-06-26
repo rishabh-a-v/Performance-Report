@@ -34,6 +34,15 @@ import { Avatar } from '@/components/ui/Avatar'
 import { useProfileStore } from '@/store/profileStore'
 import { usePermissionStore } from '@/store/permissionStore'
 
+const ROLE_ORDER: Record<string, number> = {
+  executive: 0,
+  manager: 1,
+  director: 2,
+  executive_assistant: 3,
+  hr: 3,
+  managing_director: 3,
+}
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, string> = {
@@ -154,32 +163,34 @@ function DirectionRow({
 
       {/* Actions */}
       <td className="py-4 px-5 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
-        {isDeletionPending ? (
-          <span className="text-xs text-red-500 italic">Awaiting approval…</span>
-        ) : confirmRequest ? (
-          <div className="flex items-center justify-end gap-2">
-            <span className="text-xs text-red-600 font-medium">Request deletion?</span>
+        {jd.status === 'active' && (
+          isDeletionPending ? (
+            <span className="text-xs text-red-500 italic">Awaiting approval…</span>
+          ) : confirmRequest ? (
+            <div className="flex items-center justify-end gap-2">
+              <span className="text-xs text-red-600 font-medium">Request deletion?</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); requestDeletion(jd.id); setConfirmRequest(false) }}
+                className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 transition-colors"
+              >
+                Yes
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setConfirmRequest(false) }}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
+              >
+                No
+              </button>
+            </div>
+          ) : (
             <button
-              onClick={(e) => { e.stopPropagation(); requestDeletion(jd.id); setConfirmRequest(false) }}
-              className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 transition-colors"
+              onClick={(e) => { e.stopPropagation(); setConfirmRequest(true) }}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"
             >
-              Yes
+              <Trash2 size={12} />
+              Delete
             </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); setConfirmRequest(false) }}
-              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
-            >
-              No
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={(e) => { e.stopPropagation(); setConfirmRequest(true) }}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"
-          >
-            <Trash2 size={12} />
-            Delete
-          </button>
+          )
         )}
       </td>
     </tr>
@@ -189,9 +200,16 @@ function DirectionRow({
 // ─── Team Direction Row ────────────────────────────────────────────────────────
 
 function TeamDirectionRow({ jd, onClick }: { jd: JobDirection; onClick?: () => void }) {
+  const { user, role } = useAuth()
+  const { deleteDirection } = useJobDirectionStore()
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const profiles = useProfileStore((s) => s.profiles)
   const employee = profiles.find((p) => p.id === jd.employee_id)
   const manager  = profiles.find((p) => p.id === jd.manager_id)
+
+  const isManager = jd.manager_id === user?.id
+  const isAdmin = ['managing_director', 'executive_assistant', 'hr', 'director'].includes(role ?? '')
+  const canDelete = isManager || isAdmin
 
   return (
     <tr
@@ -208,7 +226,7 @@ function TeamDirectionRow({ jd, onClick }: { jd: JobDirection; onClick?: () => v
           <Avatar name={employee?.full_name ?? '?'} size="xs" />
           <div>
             <p className="text-sm text-slate-700 font-medium leading-tight">{employee?.full_name ?? '—'}</p>
-            <p className="text-xs text-slate-400">{employee?.role ?? ''}</p>
+            <p className="text-xs text-slate-400 capitalize">{employee?.role?.replace('_', ' ') ?? ''}</p>
           </div>
         </div>
       </td>
@@ -231,6 +249,35 @@ function TeamDirectionRow({ jd, onClick }: { jd: JobDirection; onClick?: () => v
         <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold', STATUS_COLORS[jd.status])}>
           {STATUS_LABELS[jd.status] || jd.status}
         </span>
+      </td>
+      <td className="py-4 px-5 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+        {canDelete && (
+          confirmDelete ? (
+            <div className="flex items-center justify-end gap-2">
+              <span className="text-xs text-red-600 font-medium">Delete?</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteDirection(jd.id); setConfirmDelete(false) }}
+                className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 transition-colors"
+              >
+                Yes
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setConfirmDelete(false) }}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
+              >
+                No
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={(e) => { e.stopPropagation(); setConfirmDelete(true) }}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"
+            >
+              <Trash2 size={12} />
+              Delete
+            </button>
+          )
+        )}
       </td>
     </tr>
   )
@@ -319,6 +366,13 @@ export function AddDirectionModal({ open, onClose, defaultAssigneeId }: AddDirec
     const finalAssigneeId = assigneeId || (user?.id ?? '')
     const assignee = profiles.find((p) => p.id === finalAssigneeId)
 
+    const creatorRoleVal = ROLE_ORDER[user?.role ?? ''] ?? 0
+    const assigneeRoleVal = ROLE_ORDER[assignee?.role ?? ''] ?? 0
+    const isSeniorRole = creatorRoleVal >= ROLE_ORDER['executive_assistant']
+    const isTopDown = finalAssigneeId !== user?.id && creatorRoleVal > assigneeRoleVal
+
+    const initialStatus = (isSeniorRole || isTopDown) ? 'active' : 'submitted'
+
     addDirection({
       work_details:     form.work_details.trim(),
       daily_target:     dailyTarget,
@@ -328,7 +382,7 @@ export function AddDirectionModal({ open, onClose, defaultAssigneeId }: AddDirec
       manager_id:       finalAssigneeId === user?.id ? (user?.manager_id || user?.id || '') : (user?.id ?? ''),
       department_id:    assignee?.department_id ?? user?.department_id ?? null,
       remarks:          null,
-      status:           'draft',
+      status:           initialStatus,
     })
 
     setForm(EMPTY_FORM)
@@ -483,13 +537,13 @@ export function AddDirectionModal({ open, onClose, defaultAssigneeId }: AddDirec
 
 // ─── Filter tabs ───────────────────────────────────────────────────────────────
 
-type FilterTab = 'all' | 'active' | 'approved' | 'completed'
+type FilterTab = 'all' | 'draft' | 'active' | 'deletion_requested'
 
 const FILTER_TABS: { label: string; value: FilterTab }[] = [
-  { label: 'All',       value: 'all' },
-  { label: 'Active',    value: 'active' },
-  { label: 'Approved',  value: 'approved' },
-  { label: 'Completed', value: 'completed' },
+  { label: 'All',                value: 'all' },
+  { label: 'Draft',              value: 'draft' },
+  { label: 'Active',             value: 'active' },
+  { label: 'Deletion Requested',  value: 'deletion_requested' },
 ]
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
@@ -507,7 +561,8 @@ export function JobDirections() {
   const [viewMode, setViewMode]         = useState<ViewMode>('mine')
 
   useEffect(() => {
-    if ((location.state as any)?.view === 'team') setViewMode('team')
+    const state = location.state as { view?: string } | null
+    if (state?.view === 'team') setViewMode('team')
   }, [location.state])
   const [filterTab, setFilterTab]       = useState<FilterTab>('all')
   const [teamSearch, setTeamSearch]     = useState('')
@@ -535,14 +590,17 @@ export function JobDirections() {
   )
 
   // KPI counts
-  const activeCount    = myDirections.filter((d) => d.status === 'active').length
-  const approvedCount  = myDirections.filter((d) => d.status === 'approved').length
+  const activeCount    = myDirections.filter((d) => ['active', 'approved'].includes(d.status)).length
+  const approvedCount  = myDirections.filter((d) => ['active', 'completed', 'approved'].includes(d.status)).length
   const completedCount = myDirections.filter((d) => d.status === 'completed').length
 
   const JD_STATUS_ORDER: Record<string, number> = { draft: 0, active: 1, submitted: 2, approved: 3, rejected: 4, completed: 5 }
 
-  const filteredMineBase = filterTab === 'all' ? myDirections
-    : myDirections.filter((d) => d.status === filterTab)
+  const filteredMineBase = useMemo(() => {
+    if (filterTab === 'all') return myDirections
+    if (filterTab === 'active') return myDirections.filter((d) => ['active', 'approved'].includes(d.status))
+    return myDirections.filter((d) => d.status === filterTab)
+  }, [myDirections, filterTab])
 
   const filteredMine = useMemo(() => {
     return [...filteredMineBase].sort((a, b) => {
@@ -656,7 +714,9 @@ export function JobDirections() {
           <div className="flex items-center gap-0.5 border-b border-slate-100 px-4 pt-3 pb-0 overflow-x-auto">
             {FILTER_TABS.map((tab) => {
               const count = tab.value === 'all' ? myDirections.length
-                : myDirections.filter((d) => d.status === tab.value).length
+                : tab.value === 'active'
+                  ? myDirections.filter((d) => ['active', 'approved'].includes(d.status)).length
+                  : myDirections.filter((d) => d.status === tab.value).length
               return (
                 <button
                   key={tab.value}
@@ -838,15 +898,27 @@ export function JobDirections() {
                   )
                 })}
               </div>
-              {/* Desktop: schema-driven table */}
-              <div className="hidden sm:block">
-                <DynamicDataTable
-                  schema={jdSchema}
-                  data={filteredTeam as unknown as Record<string, unknown>[]}
-                  profiles={profiles}
-                  onRowClick={(row) => setSelectedDetail({ kind: 'jd', data: row as unknown as JobDirection })}
-                  loading={jdSchemaLoading}
-                />
+              {/* Desktop: Custom table with Actions */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/50">
+                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Work Details</th>
+                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Assigned To</th>
+                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Manager</th>
+                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-40">Daily Progress</th>
+                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-40">Weekly Progress</th>
+                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-40">Monthly Progress</th>
+                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Status</th>
+                      <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTeam.map((jd) => (
+                      <TeamDirectionRow key={jd.id} jd={jd} onClick={() => setSelectedDetail({ kind: 'jd', data: jd })} />
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </>
           )

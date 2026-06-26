@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useProfileStore } from '@/store/profileStore'
 import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
-import { CheckCircle2, Circle, Plus, Users, ClipboardList, Search, X, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import { CheckCircle2, Circle, Plus, Users, ClipboardList, Search, X, ChevronUp, ChevronDown, ChevronsUpDown, Trash2 } from 'lucide-react'
 import { useRBACFilter } from '@/hooks/useRBACFilter'
 import { usePermissionStore } from '@/store/permissionStore'
 import { useUISchema } from '@/hooks/useUISchema'
@@ -39,24 +39,24 @@ const STATUS_COLORS: Record<SpecialTaskStatus, string> = {
   'Yet to start': 'bg-slate-100 text-slate-600',
   'In progress':  'bg-blue-100 text-blue-700',
   Completed:    'bg-emerald-100 text-emerald-700',
-  Cancelled:    'bg-red-100 text-red-600',
-  Acknowledged: 'bg-teal-100 text-teal-700',
+  'In review':   'bg-purple-100 text-purple-700',
 }
 
 const STATUS_LABELS: Record<SpecialTaskStatus, string> = {
   'Yet to start': 'Yet to Start',
   'In progress':  'In Progress',
   Completed:    'Completed',
-  Cancelled:    'Cancelled',
-  Acknowledged: 'Acknowledged',
+  'In review':   'In Review',
 }
 
-type FilterTab = 'all' | 'in_progress' | 'completed'
+type FilterTab = 'all' | 'Yet to start' | 'In progress' | 'Completed' | 'In review'
 
 const TABS: { label: string; value: FilterTab }[] = [
-  { label: 'All',         value: 'all' },
-  { label: 'In Progress', value: 'in_progress' },
-  { label: 'Completed',   value: 'completed' },
+  { label: 'All',           value: 'all' },
+  { label: 'Yet to Start',  value: 'Yet to start' },
+  { label: 'In Progress',   value: 'In progress' },
+  { label: 'Completed',     value: 'Completed' },
+  { label: 'In Review',     value: 'In review' },
 ]
 
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
@@ -78,20 +78,22 @@ function TaskRow({ task, onClick }: { task: SpecialTask; onClick?: () => void })
   const profiles = useProfileStore((s) => s.profiles)
   const assignedBy = profiles.find((p) => p.id === task.assigned_by)
   const today = new Date().toISOString().slice(0, 10)
-  const isDone = task.status === 'Completed' || task.status === 'Acknowledged'
-  const isOverdue = task.due_date && task.due_date < today && !isDone
-  const isAcknowledged = task.status === 'Acknowledged'
+  const isDone = task.status === 'Completed'
+  const isInReview = task.status === 'In review'
+  const isOverdue = task.due_date && task.due_date < today && !isDone && !isInReview
   const isAssigner = user?.id === task.assigned_by
 
   function handleToggle(e: React.MouseEvent) {
     e.stopPropagation()
-    if (isDone && !isAcknowledged) setStatus(task.id, 'Yet to start')
-    else if (!isDone) setStatus(task.id, 'Completed')
+    if (isDone || isInReview) setStatus(task.id, 'Yet to start')
+    else if (task.status === 'Yet to start') setStatus(task.id, 'In progress')
+    else if (isAssigner) setStatus(task.id, 'Completed')
+    else setStatus(task.id, 'In review')
   }
 
-  function handleAcknowledge(e: React.MouseEvent) {
+  function handleApprove(e: React.MouseEvent) {
     e.stopPropagation()
-    setStatus(task.id, 'Acknowledged')
+    setStatus(task.id, 'Completed')
   }
 
   return (
@@ -133,24 +135,36 @@ function TaskRow({ task, onClick }: { task: SpecialTask; onClick?: () => void })
         </span>
       </td>
       <td className="py-4 px-5 whitespace-nowrap">
-        <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold', STATUS_COLORS[task.status])}>
-          {STATUS_LABELS[task.status]}
-        </span>
+        <div className="flex flex-col gap-1 items-start">
+          <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold', STATUS_COLORS[task.status])}>
+            {STATUS_LABELS[task.status]}
+          </span>
+          {task.approval_status === 'pending' && (
+            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+              Pending Approval
+            </span>
+          )}
+          {task.approval_status === 'rejected' && (
+            <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+              Changes Requested
+            </span>
+          )}
+        </div>
       </td>
       <td className="py-4 px-5 whitespace-nowrap text-right">
         <div className="flex items-center justify-end gap-2">
-          {isAssigner && task.status === 'Completed' && (
+          {isAssigner && task.status === 'In review' && (
             <button
-              onClick={handleAcknowledge}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700 hover:bg-teal-100 transition-colors"
+              onClick={handleApprove}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
             >
               <CheckCircle2 size={11} />
-              Acknowledge
+              Approve
             </button>
           )}
-          {isDone && !isAcknowledged && !isAssigner && (
+          {isInReview && !isAssigner && (
             <button onClick={handleToggle} className="text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors">
-              Undo
+              Undo Submit
             </button>
           )}
         </div>
@@ -162,11 +176,18 @@ function TaskRow({ task, onClick }: { task: SpecialTask; onClick?: () => void })
 // ─── Team Task Row ─────────────────────────────────────────────────────────────
 
 function TeamTaskRow({ task, onClick }: { task: SpecialTask; onClick?: () => void }) {
+  const { user, role } = useAuth()
+  const { deleteTask, setStatus } = useSpecialTaskStore()
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const profiles = useProfileStore((s) => s.profiles)
   const assignees = (task.assignees ?? []).map((a) => profiles.find((p) => p.id === a.employee_id)).filter(Boolean) as typeof profiles
   const assignedBy = profiles.find((p) => p.id === task.assigned_by)
   const today = new Date().toISOString().slice(0, 10)
-  const isOverdue = task.due_date && task.due_date < today && task.status !== 'Completed' && task.status !== 'Acknowledged'
+  const isOverdue = task.due_date && task.due_date < today && task.status !== 'Completed' && task.status !== 'In review'
+
+  const isAssigner = task.assigned_by === user?.id
+  const isAdmin = ['managing_director', 'executive_assistant', 'hr', 'director'].includes(role ?? '')
+  const canDelete = isAssigner || isAdmin
 
   return (
     <tr
@@ -226,9 +247,67 @@ function TeamTaskRow({ task, onClick }: { task: SpecialTask; onClick?: () => voi
         </span>
       </td>
       <td className="py-4 px-5 whitespace-nowrap">
-        <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold', STATUS_COLORS[task.status])}>
-          {STATUS_LABELS[task.status]}
-        </span>
+        <div className="flex flex-col gap-1 items-start">
+          {(isAssigner || isAdmin) ? (
+            <select
+              value={task.status}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => { setStatus(task.id, e.target.value as SpecialTaskStatus) }}
+              className={cn(
+                'rounded-full px-2.5 py-0.5 text-xs font-semibold border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-300',
+                STATUS_COLORS[task.status]
+              )}
+            >
+              <option value="Yet to start">Yet to Start</option>
+              <option value="In progress">In Progress</option>
+              <option value="In review">In Review</option>
+              <option value="Completed">Completed</option>
+            </select>
+          ) : (
+            <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold', STATUS_COLORS[task.status])}>
+              {STATUS_LABELS[task.status]}
+            </span>
+          )}
+          {task.approval_status === 'pending' && (
+            <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+              Pending Approval
+            </span>
+          )}
+          {task.approval_status === 'rejected' && (
+            <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+              Changes Requested
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="py-4 px-5 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+        {canDelete && (
+          confirmDelete ? (
+            <div className="flex items-center justify-end gap-2">
+              <span className="text-xs text-red-600 font-medium">Delete?</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteTask(task.id); setConfirmDelete(false) }}
+                className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 transition-colors"
+              >
+                Yes
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setConfirmDelete(false) }}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
+              >
+                No
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={(e) => { e.stopPropagation(); setConfirmDelete(true) }}
+              className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors"
+            >
+              <Trash2 size={11} />
+              Delete
+            </button>
+          )
+        )}
       </td>
     </tr>
   )
@@ -412,7 +491,8 @@ export function SpecialTasks() {
   const [viewMode, setViewMode]       = useState<ViewMode>('mine')
 
   useEffect(() => {
-    if ((location.state as any)?.view === 'team') setViewMode('team')
+    const state = location.state as { view?: string } | null
+    if (state?.view === 'team') setViewMode('team')
   }, [location.state])
   const [showAdd, setShowAdd]         = useState(false)
   const [selectedDetail, setSelectedDetail] = useState<{ kind: 'st'; data: SpecialTask } | null>(null)
@@ -443,13 +523,13 @@ export function SpecialTasks() {
       !t.assignees?.some((a) => a.employee_id === user.id) &&
       t.assignees?.some((a) => allowedIds.has(a.employee_id))
   )
-  const activeTeam = teamTasks.filter((t) => t.status !== 'Completed' && t.status !== 'Acknowledged').length
+  const activeTeam = teamTasks.filter((t) => t.status !== 'Completed').length
 
   const today = new Date().toISOString().slice(0, 10)
-  const dueTodayCount   = myTasks.filter((t) => t.due_date === today && t.status !== 'Completed' && t.status !== 'Acknowledged').length
-  const overdueCount    = myTasks.filter((t) => t.due_date && t.due_date < today && t.status !== 'Completed' && t.status !== 'Acknowledged').length
-  const inProgressCount = myTasks.filter((t) => (t.status === 'Yet to start' || t.status === 'In progress')).length
-  const completedCount  = myTasks.filter((t) => t.status === 'Completed' || t.status === 'Acknowledged').length
+  const dueTodayCount   = myTasks.filter((t) => t.due_date === today && t.status !== 'Completed').length
+  const overdueCount    = myTasks.filter((t) => t.due_date && t.due_date < today && t.status !== 'Completed').length
+  const inProgressCount = myTasks.filter((t) => (t.status === 'Yet to start' || t.status === 'In progress' || t.status === 'In review')).length
+  const completedCount  = myTasks.filter((t) => t.status === 'Completed').length
 
   // Unique assignees across team tasks for the employee filter
   const teamEmployees = useMemo(() => {
@@ -489,14 +569,12 @@ export function SpecialTasks() {
     return list
   }, [teamTasks, teamBranch, teamDept, teamEmployee, teamSearch, profiles])
 
-  const STATUS_ORDER: Record<string, number> = { 'Yet to start': 0, 'In progress': 1, Completed: 2, Cancelled: 3, Acknowledged: 4 }
+  const STATUS_ORDER: Record<string, number> = { 'Yet to start': 0, 'In progress': 1, 'In review': 2, Completed: 3 }
 
   const filteredMine = useMemo(() => {
     const base = activeTab === 'all'
       ? myTasks
-      : activeTab === 'in_progress'
-        ? myTasks.filter((t) => t.status === 'Yet to start' || t.status === 'In progress')
-        : myTasks.filter((t) => t.status === 'Completed' || t.status === 'Acknowledged')
+      : myTasks.filter((t) => t.status === activeTab)
     return [...base].sort((a, b) => {
       const sign = mySortDir === 'asc' ? 1 : -1
       if (mySortKey === 'task_name') return sign * (a.task_name ?? '').localeCompare(b.task_name ?? '')
@@ -594,9 +672,7 @@ export function SpecialTasks() {
             {TABS.map((tab) => {
               const count = tab.value === 'all'
                 ? myTasks.length
-                : tab.value === 'in_progress'
-                  ? myTasks.filter((t) => t.status === 'Yet to start' || t.status === 'In progress').length
-                  : myTasks.filter((t) => t.status === 'Completed' || t.status === 'Acknowledged').length
+                : myTasks.filter((t) => t.status === tab.value).length
               return (
                 <button
                   key={tab.value}
@@ -698,8 +774,9 @@ export function SpecialTasks() {
                 {filteredMine.map((task) => {
                   const assignedBy = profiles.find((p) => p.id === task.assigned_by)
                   const today2 = new Date().toISOString().slice(0, 10)
-                  const isDone = task.status === 'Completed' || task.status === 'Acknowledged'
-                  const isOverdue = task.due_date && task.due_date < today2 && !isDone
+                  const isDone = task.status === 'Completed'
+                  const isInReview = task.status === 'In review'
+                  const isOverdue = task.due_date && task.due_date < today2 && !isDone && !isInReview
                   return (
                     <div key={task.id} onClick={() => setSelectedDetail({ kind: 'st', data: task })} className="px-4 py-3 hover:bg-slate-50/70 cursor-pointer active:bg-slate-100">
                       <div className="flex items-start justify-between gap-2">
@@ -752,14 +829,32 @@ export function SpecialTasks() {
 
         {/* ── Team tasks ── */}
         {viewMode === 'team' && (
-          <DynamicDataTable
-            schema={taskSchema}
-            data={filteredTeam as unknown as Record<string, unknown>[]}
-            profiles={profiles}
-            onRowClick={(row) => setSelectedDetail({ kind: 'st', data: row as unknown as SpecialTask })}
-            emptyMessage={teamSearch || teamEmployee !== 'all' ? 'No tasks match your filters.' : 'No team tasks yet.'}
-            loading={taskSchemaLoading}
-          />
+          filteredTeam.length === 0 ? (
+            <div className="px-6 py-10 text-center text-sm text-slate-400">
+              {teamSearch || teamEmployee !== 'all' ? 'No tasks match your filters.' : 'No team tasks yet.'}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/50">
+                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Task</th>
+                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Assigned To</th>
+                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Assigned By</th>
+                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Date Assigned</th>
+                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Due Date</th>
+                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Status</th>
+                    <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTeam.map((task) => (
+                    <TeamTaskRow key={task.id} task={task} onClick={() => setSelectedDetail({ kind: 'st', data: task })} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
         )}
       </div>
 

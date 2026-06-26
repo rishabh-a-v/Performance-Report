@@ -5,7 +5,7 @@ import { useReportingStore } from '@/store/reportingStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { Check, AlertCircle, Loader2, UserPlus } from 'lucide-react';
 
-const ROLE_OPTIONS = ['MD', 'Director', 'EA', 'Manager', 'Executive'];
+const ROLE_OPTIONS = ['MD', 'Director', 'EA', 'HR', 'Manager', 'Executive'];
 
 const fieldClass =
   'mt-1 block w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none focus:ring-1 focus:ring-indigo-300 transition-colors';
@@ -43,7 +43,7 @@ export const AddEmployee = () => {
 
   useEffect(() => { fetchProfiles(); fetchDepartments(); fetchBranches() }, []);
 
-  if (!['managing_director', 'executive_assistant', 'director'].includes(currentUserRole ?? '')) {
+  if (!['managing_director', 'executive_assistant', 'hr', 'director'].includes(currentUserRole ?? '')) {
     return (
       <div className="flex items-center gap-3 rounded-xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-700">
         <AlertCircle size={16} className="shrink-0" />

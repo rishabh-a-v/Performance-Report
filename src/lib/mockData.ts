@@ -89,7 +89,7 @@ export const JOB_DIRECTIONS: JobDirection[] = [
     status: 'active',
     remarks: 'Outreach volume increased.',
     employee_id: '00000000-0000-0000-0000-000000000015',
-    manager_id: '00000000-0000-0000-0000-000000000009',
+    manager_id: '00000000-0000-0000-0000-000000000008',
     department_id: '00000000-0000-0000-0000-000000000103'
   }
 ]

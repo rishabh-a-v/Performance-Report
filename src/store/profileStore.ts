@@ -12,6 +12,7 @@ interface ProfileStore {
   fetchBranches: () => Promise<void>
   fetchAll: () => Promise<void>
   getProfileById: (id: string) => Profile | undefined
+  subscribeToRealtime: () => () => void
 }
 
 export const useProfileStore = create<ProfileStore>((set, get) => ({
@@ -45,4 +46,14 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
   },
 
   getProfileById: (id) => get().profiles.find((p) => p.id === id),
+
+  subscribeToRealtime: () => {
+    const channel = supabase
+      .channel('profiles-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => get().fetchProfiles())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'departments' }, () => get().fetchDepartments())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'branches' }, () => get().fetchBranches())
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  },
 }))

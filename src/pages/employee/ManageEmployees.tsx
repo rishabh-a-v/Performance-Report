@@ -7,16 +7,17 @@ import { Search, Pencil, X, Check, Loader2, Trash2, AlertTriangle } from 'lucide
 import { useRBACFilter } from '@/hooks/useRBACFilter'
 import { useUISchema } from '@/hooks/useUISchema'
 import { DynamicDataTable } from '@/components/ui/DynamicDataTable'
+import type { UserRole } from '@/types/database'
 
-const ROLE_OPTIONS = ['MD', 'Director', 'EA', 'Manager', 'Executive']
+const ROLE_OPTIONS = ['MD', 'Director', 'EA', 'HR', 'Manager', 'Executive']
 
 const DB_ROLE_MAP: Record<string, string> = {
   MD: 'managing_director', Director: 'director', EA: 'executive_assistant',
-  Manager: 'manager', Executive: 'executive',
+  HR: 'hr', Manager: 'manager', Executive: 'executive',
 }
 const DISPLAY_ROLE_MAP: Record<string, string> = {
   managing_director: 'MD', director: 'Director', executive_assistant: 'EA',
-  manager: 'Manager', executive: 'Executive',
+  hr: 'HR', manager: 'Manager', executive: 'Executive',
 }
 
 interface EditState {
@@ -73,10 +74,10 @@ export function ManageEmployees() {
     setEditState({
       name:        p.full_name  ?? '',
       phone:       p.phone_no   ?? '',
-      department:  r?.department ?? '',
+      department:  r?.department || p.department_id || '',
       role:        DISPLAY_ROLE_MAP[p.role ?? ''] ?? 'Executive',
-      branch:      r?.branch    ?? '',
-      reportingTo: r?.reporting_to_id ?? null,
+      branch:      r?.branch    || p.branch || '',
+      reportingTo: r?.reporting_to_id ?? p.manager_id ?? null,
     })
   }
 
@@ -96,9 +97,11 @@ export function ManageEmployees() {
 
       // Update profiles row
       const { error: pErr } = await supabase.from('profiles').update({
-        full_name: editState.name.trim(),
-        phone_no:  editState.phone.trim() || null,
-        role:      DB_ROLE_MAP[editState.role] as any,
+        full_name:  editState.name.trim(),
+        phone_no:   editState.phone.trim() || null,
+        role:       DB_ROLE_MAP[editState.role] as UserRole,
+        branch:     editState.branch || null,
+        manager_id: editState.reportingTo || null,
       }).eq('id', id)
       if (pErr) throw pErr
 

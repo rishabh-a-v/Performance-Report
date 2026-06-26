@@ -18,6 +18,7 @@ import { useProfileStore } from '@/store/profileStore'
 import { useJobDirectionStore } from '@/store/jobDirectionStore'
 import { useSpecialTaskStore } from '@/store/specialTaskStore'
 import { usePermissionStore } from '@/store/permissionStore'
+import { useReportingStore } from '@/store/reportingStore'
 
 const ROLE_LEVEL: Record<UserRole, number> = {
   executive: 0, executive_assistant: 3, hr: 3, manager: 1, director: 2, managing_director: 3,
@@ -26,8 +27,10 @@ const ROLE_LEVEL: Record<UserRole, number> = {
 function Protected({ children, minRole }: { children: React.ReactNode; minRole?: UserRole }) {
   const { isAuthenticated, role } = useAuth()
   if (!isAuthenticated) return <Navigate to="/login" replace />
-  if (minRole && role && ROLE_LEVEL[role] < ROLE_LEVEL[minRole]) {
-    return <Navigate to="/overview" replace />
+  if (minRole) {
+    if (!role || ROLE_LEVEL[role] < ROLE_LEVEL[minRole]) {
+      return <Navigate to="/overview" replace />
+    }
   }
   return <>{children}</>
 }
@@ -41,6 +44,15 @@ function AppRoutes() {
       useJobDirectionStore.getState().fetchAll()
       useSpecialTaskStore.getState().fetchTasks()
       usePermissionStore.getState().fetchPermissions(role)
+
+      const unsubs = [
+        useProfileStore.getState().subscribeToRealtime(),
+        useReportingStore.getState().subscribeToRealtime(),
+        useJobDirectionStore.getState().subscribeToRealtime(),
+        useSpecialTaskStore.getState().subscribeToRealtime(),
+        usePermissionStore.getState().subscribeToRealtime(role),
+      ]
+      return () => { unsubs.forEach((u) => u()) }
     }
   }, [isAuthenticated, role])
 

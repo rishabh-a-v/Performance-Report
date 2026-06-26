@@ -33,8 +33,7 @@ const TASK_STATUS_PILL: Record<string, string> = {
   'Yet to start': 'bg-slate-100 text-slate-500',
   'In progress':  'bg-blue-100 text-blue-700',
   Completed:      'bg-emerald-100 text-emerald-700',
-  Cancelled:      'bg-red-100 text-red-600',
-  Acknowledged:   'bg-teal-100 text-teal-700',
+  'In review':    'bg-purple-100 text-purple-700',
 }
 
 function getGreeting() {
@@ -131,7 +130,7 @@ function JDRow({ jd, profiles }: { jd: JobDirection; profiles: ReturnType<typeof
 }
 
 function TaskRow({ task, today, profiles }: { task: SpecialTask; today: string; profiles: ReturnType<typeof useProfileStore['getState']>['profiles'] }) {
-  const isOverdue = task.due_date && task.due_date < today && task.status !== 'Completed' && task.status !== 'Cancelled'
+  const isOverdue = task.due_date && task.due_date < today && task.status !== 'Completed'
   const assigner = profiles.find((p) => p.id === task.assigned_by)
   const pillClass = TASK_STATUS_PILL[task.status] ?? 'bg-slate-100 text-slate-500'
 
@@ -188,16 +187,16 @@ export function Overview() {
 
   // "Active" matches the JD page's Active KPI (status === 'active' only)
   const myActiveJDs   = myJDs.filter((d) => d.status === 'active')
-  // "Active" tasks matches SpecialTasks: not Completed and not Acknowledged
-  const myActiveTasks = myTasks.filter((t) => t.status !== 'Completed' && t.status !== 'Acknowledged')
+  // "Active" tasks matches SpecialTasks: not Completed
+  const myActiveTasks = myTasks.filter((t) => t.status !== 'Completed')
 
-  // Overdue: same exclusions as SpecialTasks (Acknowledged = done)
-  const myOverdue = myTasks.filter((t) => t.due_date && t.due_date < today && t.status !== 'Completed' && t.status !== 'Acknowledged').length
+  // Overdue: same exclusions as SpecialTasks
+  const myOverdue = myTasks.filter((t) => t.due_date && t.due_date < today && t.status !== 'Completed').length
 
-  // Completed: Acknowledged is a done state (matches SpecialTasks completedCount)
+  // Completed
   const myCompleted = [
     ...myJDs.filter((d) => d.status === 'completed'),
-    ...myTasks.filter((t) => (t.status === 'Completed' || t.status === 'Acknowledged') && t.created_at?.startsWith(thisMonth)),
+    ...myTasks.filter((t) => t.status === 'Completed' && t.created_at?.startsWith(thisMonth)),
   ].length
 
   // Recent items (up to 4)
@@ -216,9 +215,9 @@ export function Overview() {
 
   // Active team JDs: matches JD page teamDirections activeTeam = status !== 'completed'
   const teamActiveJDs   = directions.filter((d) => directReportIds.includes(d.employee_id) && d.status !== 'completed').length
-  // Active team tasks / overdue: matches SpecialTasks activeTeam = !== Completed && !== Acknowledged
-  const teamActiveTasks = tasks.filter((t) => t.assignees?.some((a) => directReportIds.includes(a.employee_id)) && t.status !== 'Completed' && t.status !== 'Acknowledged').length
-  const teamOverdue     = tasks.filter((t) => directReportIds.some((id) => t.assignees?.some((a) => a.employee_id === id)) && t.due_date && t.due_date < today && t.status !== 'Completed' && t.status !== 'Acknowledged').length
+  // Active team tasks / overdue: matches SpecialTasks activeTeam = !== Completed
+  const teamActiveTasks = tasks.filter((t) => t.assignees?.some((a) => directReportIds.includes(a.employee_id)) && t.status !== 'Completed').length
+  const teamOverdue     = tasks.filter((t) => directReportIds.some((id) => t.assignees?.some((a) => a.employee_id === id)) && t.due_date && t.due_date < today && t.status !== 'Completed').length
 
   // Recent pending JDs awaiting my approval
   const pendingJDs = directions
@@ -228,9 +227,9 @@ export function Overview() {
   // ── Org stats (directors+) ──────────────────────────────────────────────────
   // Active org JDs: matches JD page definition (status !== 'completed')
   const orgActiveJDs   = directions.filter((d) => d.status !== 'completed').length
-  // Active/overdue org tasks: matches SpecialTasks (Acknowledged = done)
-  const orgActiveTasks = tasks.filter((t) => t.status !== 'Completed' && t.status !== 'Acknowledged').length
-  const orgOverdue     = tasks.filter((t) => t.due_date && t.due_date < today && t.status !== 'Completed' && t.status !== 'Acknowledged').length
+  // Active/overdue org tasks: matches SpecialTasks
+  const orgActiveTasks = tasks.filter((t) => t.status !== 'Completed').length
+  const orgOverdue     = tasks.filter((t) => t.due_date && t.due_date < today && t.status !== 'Completed').length
   const orgEmployees   = profiles.length
 
   const dateLabel = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })

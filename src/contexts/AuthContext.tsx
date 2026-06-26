@@ -16,12 +16,13 @@ interface AuthContextValue extends AuthState {
   updateProfile: (updates: Partial<Pick<Profile, 'full_name' | 'phone_no' | 'branch'>>) => Promise<void>
 }
 
-const ROLE_ORDER: UserRole[] = ['executive', 'manager', 'director', 'managing_director']
-
-// EA and HR share MD-level permissions for all hierarchical access checks
-function effectiveRole(role: UserRole | null): UserRole | null {
-  if (role === 'executive_assistant' || role === 'hr') return 'managing_director'
-  return role
+const ROLE_LEVEL: Record<UserRole, number> = {
+  executive: 0,
+  manager: 1,
+  director: 2,
+  managing_director: 3,
+  executive_assistant: 3,
+  hr: 3,
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -115,9 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const can = useCallback(
     (minRole: UserRole) => {
       if (!state.role) return false
-      const eff = effectiveRole(state.role)
-      if (!eff) return false
-      return ROLE_ORDER.indexOf(eff) >= ROLE_ORDER.indexOf(minRole)
+      return ROLE_LEVEL[state.role] >= ROLE_LEVEL[minRole]
     },
     [state.role],
   )

@@ -6,18 +6,21 @@ interface PermissionStore {
   permissions: RolePermission | null
   allPermissions: RolePermission[]
   isLoading: boolean
+  currentRole: string | null
   fetchPermissions: (role: string) => Promise<void>
   fetchAllPermissions: () => Promise<void>
   updatePermission: (role: string, updates: Partial<RolePermission>, updatedBy: string) => Promise<void>
+  subscribeToRealtime: (role: string) => () => void
 }
 
 export const usePermissionStore = create<PermissionStore>((set, get) => ({
   permissions: null,
   allPermissions: [],
   isLoading: false,
+  currentRole: null,
 
   fetchPermissions: async (role: string) => {
-    set({ isLoading: true })
+    set({ isLoading: true, currentRole: role })
     const { data, error } = await supabase
       .from('role_permissions')
       .select('*')
@@ -60,5 +63,17 @@ export const usePermissionStore = create<PermissionStore>((set, get) => ({
         ? { ...s.permissions, ...updates }
         : s.permissions,
     }))
+  },
+
+  subscribeToRealtime: (role: string) => {
+    const channel = supabase
+      .channel('permissions-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'role_permissions' }, () => {
+        const currentRole = get().currentRole ?? role
+        get().fetchPermissions(currentRole)
+        if (get().allPermissions.length > 0) get().fetchAllPermissions()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   },
 }))

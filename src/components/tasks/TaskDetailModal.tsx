@@ -15,20 +15,13 @@ interface Props {
 }
 
 export function TaskDetailModal({ item, onClose }: Props) {
-  if (!item) return null
-
-  const isJD = item.kind === 'jd'
-  const { user } = useAuth()
+  const { user, role } = useAuth()
   const profiles = useProfileStore((s) => s.profiles)
+  const directions = useJobDirectionStore((s) => s.directions)
+  const tasks = useSpecialTaskStore((s) => s.tasks)
 
-  const jd = isJD ? (item.data as JobDirection) : null
-  const st = !isJD ? (item.data as SpecialTask) : null
-
-  const employee = profiles.find((p) => p.id === (jd ? jd.employee_id : ''))
-  const manager = profiles.find((p) => p.id === (jd ? jd.manager_id : st ? st.assigned_by : ''))
-  const allAssignees = !isJD && st
-    ? (st.assignees ?? []).map((a) => profiles.find((p) => p.id === a.employee_id)).filter(Boolean) as typeof profiles
-    : []
+  const [progressValue, setProgressValue] = useState('')
+  const [isLoggingProgress, setIsLoggingProgress] = useState(false)
 
   // Editing state
   const [isEditing, setIsEditing] = useState(false)
@@ -59,22 +52,58 @@ export function TaskDetailModal({ item, onClose }: Props) {
     }
   }, [item, isEditing])
 
+  if (!item) return null
+
+  const isJD = item.kind === 'jd'
+  const jd = isJD ? (directions.find((d) => d.id === item.data.id) || (item.data as JobDirection)) : null
+  const st = !isJD ? (tasks.find((t) => t.id === item.data.id) || (item.data as SpecialTask)) : null
+
+  async function handleLogProgress(e: React.FormEvent) {
+    e.preventDefault()
+    if (!jd || !progressValue) return
+    const val = parseFloat(progressValue)
+    if (isNaN(val) || val <= 0) return
+
+    setIsLoggingProgress(true)
+    await useJobDirectionStore.getState().updateProgress(jd.id, val)
+    setProgressValue('')
+    setIsLoggingProgress(false)
+  }
+
+  const employee = profiles.find((p) => p.id === (jd ? jd.employee_id : ''))
+  const manager = profiles.find((p) => p.id === (jd ? jd.manager_id : st ? st.assigned_by : ''))
+  const allAssignees = !isJD && st
+    ? (st.assignees ?? []).map((a) => profiles.find((p) => p.id === a.employee_id)).filter(Boolean) as typeof profiles
+    : []
+  const canEdit = !isJD || (
+    user?.role === 'managing_director' ||
+    user?.role === 'executive_assistant' ||
+    user?.role === 'hr' ||
+    (jd && jd.manager_id === user?.id)
+  )
+
   function handleSave(e: React.FormEvent) {
     e.preventDefault()
     if (!item) return
     if (isJD) {
+      const isEmployee = jd && user?.id === jd.employee_id
+      const statusUpdate = isEmployee ? { status: 'submitted' } : {}
       useJobDirectionStore.getState().updateDirection(item.data.id, {
         work_details: editWorkDetails.trim() || null,
         daily_target: parseFloat(editDailyTarget) || 0,
         weekly_target: parseFloat(editWeeklyTarget) || 0,
         monthly_target: parseFloat(editMonthlyTarget) || 0,
         remarks: editRemarks.trim() || null,
+        ...statusUpdate,
       })
     } else {
+      const isAssignee = st?.assignees?.some((a) => a.employee_id === user?.id)
+      const approvalUpdate = isAssignee ? { approval_status: 'pending' as const } : {}
       useSpecialTaskStore.getState().updateTask(item.data.id, {
         task_name: editTaskName.trim(),
         due_date: editDueDate || null,
         remarks: editRemarks.trim() || null,
+        ...approvalUpdate,
       })
     }
     setIsEditing(false)
@@ -108,7 +137,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {!isEditing && (
+            {!isEditing && canEdit && (
               <button
                 onClick={() => setIsEditing(true)}
                 className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
@@ -263,18 +292,52 @@ export function TaskDetailModal({ item, onClose }: Props) {
                 <span className={cn(
                   'inline-block rounded-full px-2 py-0.5 font-semibold text-[10px]',
                   isJD 
-                    ? 'bg-blue-100 text-blue-700'
+                    ? {
+                        draft:               'bg-slate-100 text-slate-500',
+                        active:              'bg-blue-100 text-blue-700',
+                        submitted:           'bg-amber-100 text-amber-700',
+                        approved:            'bg-emerald-100 text-emerald-700',
+                        rejected:            'bg-red-100 text-red-700',
+                        completed:           'bg-slate-100 text-slate-600',
+                        deletion_requested:  'bg-red-100 text-red-700',
+                      }[jd?.status || ''] ?? 'bg-blue-100 text-blue-700'
                     : {
-                        yet_to_start: 'bg-slate-100 text-slate-600',
-                        in_progress:  'bg-blue-100 text-blue-700',
-                        completed:    'bg-emerald-100 text-emerald-700',
-                        cancelled:    'bg-red-100 text-red-600',
-                        acknowledged: 'bg-teal-100 text-teal-700',
+                        'Yet to start': 'bg-slate-100 text-slate-600',
+                        'In progress':  'bg-blue-100 text-blue-700',
+                        'Completed':    'bg-emerald-100 text-emerald-700',
+                        'In review':    'bg-purple-100 text-purple-700',
                       }[st?.status as string]
                 )}>
-                  {isJD ? jd?.status : st?.status}
+                  {isJD 
+                    ? ({
+                        draft:               'Draft',
+                        active:              'Active',
+                        submitted:           'Under Review',
+                        approved:            'Approved',
+                        rejected:            'Changes Needed',
+                        completed:           'Completed',
+                        deletion_requested:  'Deletion Pending',
+                      }[jd?.status || ''] ?? jd?.status)
+                    : st?.status}
                 </span>
               </div>
+
+              {/* Approval Status (ST only) */}
+              {!isJD && st && (
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Approval Status</span>
+                  <span className={cn(
+                    'inline-block rounded-full px-2 py-0.5 font-semibold text-[10px]',
+                    {
+                      pending:  'bg-amber-100 text-amber-700',
+                      approved: 'bg-emerald-100 text-emerald-700',
+                      rejected: 'bg-red-100 text-red-700',
+                    }[st.approval_status || 'approved']
+                  )}>
+                    {st.approval_status === 'pending' ? 'Pending Approval' : st.approval_status === 'rejected' ? 'Changes Requested' : 'Approved'}
+                  </span>
+                </div>
+              )}
 
               {/* Employee / Assignees */}
               <div className="space-y-1">
@@ -343,52 +406,161 @@ export function TaskDetailModal({ item, onClose }: Props) {
               </div>
             )}
 
-            {/* Status Actions (ST only) */}
+            {/* Log Progress Actions (JD only, for the assignee when active) */}
+            {isJD && jd && user?.id === jd.employee_id && jd.status === 'active' && (
+              <div className="border-t border-slate-100 pt-3.5 space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Log Progress</span>
+                <form onSubmit={handleLogProgress} className="flex gap-2">
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    placeholder="Enter amount completed..."
+                    value={progressValue}
+                    onChange={(e) => setProgressValue(e.target.value)}
+                    className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isLoggingProgress}
+                    className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm shrink-0"
+                  >
+                    {isLoggingProgress ? 'Logging...' : 'Log Progress'}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {isJD && jd && user?.id === jd.employee_id && jd.status === 'draft' && (
+              <div className="border-t border-slate-100 pt-3.5 space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Actions</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { useJobDirectionStore.getState().submitForReview(jd.id); onClose() }}
+                    className="flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shadow-sm"
+                  >
+                    Submit for Review
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {isJD && jd && (
+              (() => {
+                const isManager = jd.manager_id === user?.id
+                const isAdmin = ['managing_director', 'executive_assistant', 'hr', 'director'].includes(role ?? '')
+                const canDelete = isManager || isAdmin
+
+                if (!canDelete) return null
+
+                return (
+                  <div className="border-t border-slate-100 pt-3.5 space-y-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Actions</span>
+                    <button
+                      onClick={() => {
+                        if (confirm('Are you sure you want to delete this Job Direction?')) {
+                          useJobDirectionStore.getState().deleteDirection(jd.id)
+                          onClose()
+                        }
+                      }}
+                      className="w-full rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 transition-colors shadow-sm"
+                    >
+                      Delete Job Direction
+                    </button>
+                  </div>
+                )
+              })()
+            )}
+
             {!isJD && st && (
               <div className="border-t border-slate-100 pt-3.5 space-y-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Actions</span>
                 <div className="flex flex-wrap gap-2">
-                  {isAssignee && st.status === 'Yet to start' && (
-                    <button
-                      onClick={() => { useSpecialTaskStore.getState().setStatus(st.id, 'In progress'); onClose() }}
-                      className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition-colors"
-                    >
-                      Mark In Progress
-                    </button>
+                  {st.approval_status === 'pending' && (
+                    <p className="text-xs text-amber-600 font-semibold bg-amber-50 rounded-lg p-2.5 border border-amber-100 flex-1 text-center">
+                      Awaiting details approval from manager before you can start or complete this task.
+                    </p>
                   )}
-                  {isAssignee && st.status === 'In progress' && (
-                    <button
-                      onClick={() => { useSpecialTaskStore.getState().setStatus(st.id, 'Completed'); onClose() }}
-                      className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
-                    >
-                      Mark Complete
-                    </button>
+                  {st.approval_status === 'rejected' && (
+                    <div className="flex flex-col gap-1.5 flex-1">
+                      <p className="text-xs text-red-600 font-semibold bg-red-50 rounded-lg p-2.5 border border-red-100 text-center">
+                        Changes requested by manager: {st.rejection_note || 'No notes left.'}
+                      </p>
+                      <p className="text-[10px] text-slate-500 text-center">
+                        Click "Edit" in the top right to make changes and submit for approval.
+                      </p>
+                    </div>
                   )}
-                  {isAssignee && st.status === 'Completed' && (
-                    <button
-                      onClick={() => { useSpecialTaskStore.getState().setStatus(st.id, 'In progress'); onClose() }}
-                      className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-                    >
-                      Undo (back to In Progress)
-                    </button>
-                  )}
-                  {isAssigner && st.status === 'Completed' && (
-                    <button
-                      onClick={() => { useSpecialTaskStore.getState().setStatus(st.id, 'Acknowledged'); onClose() }}
-                      className="flex-1 rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-700 transition-colors"
-                    >
-                      ✓ Acknowledge
-                    </button>
-                  )}
-                  {isAssigner && !['Completed', 'Acknowledged', 'Cancelled'].includes(st.status) && (
-                    <button
-                      onClick={() => { useSpecialTaskStore.getState().setStatus(st.id, 'Cancelled'); onClose() }}
-                      className="flex-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors"
-                    >
-                      Cancel Task
-                    </button>
+                  {(st.approval_status === 'approved' || !st.approval_status) && (
+                    <>
+                      {isAssignee && st.status === 'Yet to start' && (
+                        <button
+                          onClick={() => { useSpecialTaskStore.getState().setStatus(st.id, 'In progress'); onClose() }}
+                          className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition-colors"
+                        >
+                          Mark In Progress
+                        </button>
+                      )}
+                      {isAssignee && st.status === 'In progress' && (
+                        <button
+                          onClick={() => { useSpecialTaskStore.getState().setStatus(st.id, 'In review'); onClose() }}
+                          className="flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+                        >
+                          Submit for Review
+                        </button>
+                      )}
+                      {isAssignee && st.status === 'In review' && (
+                        <button
+                          onClick={() => { useSpecialTaskStore.getState().setStatus(st.id, 'In progress'); onClose() }}
+                          className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                        >
+                          Undo Submit (back to In Progress)
+                        </button>
+                      )}
+                      {isAssignee && st.status === 'Completed' && (
+                        <button
+                          onClick={() => { useSpecialTaskStore.getState().setStatus(st.id, 'In progress'); onClose() }}
+                          className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                        >
+                          Undo (back to In Progress)
+                        </button>
+                      )}
+                      {isAssigner && st.status === 'In review' && (
+                        <>
+                          <button
+                            onClick={() => { useSpecialTaskStore.getState().setStatus(st.id, 'Completed'); onClose() }}
+                            className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+                          >
+                            ✓ Approve & Complete
+                          </button>
+                          <button
+                            onClick={() => { useSpecialTaskStore.getState().setStatus(st.id, 'In progress'); onClose() }}
+                            className="flex-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors"
+                          >
+                            ✕ Request Revision
+                          </button>
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
+
+                {/* Delete Task — assigner or admin only */}
+                {(isAssigner || ['managing_director', 'executive_assistant', 'hr', 'director'].includes(role ?? '')) && (
+                  <div className="border-t border-slate-100 pt-2">
+                    <button
+                      onClick={() => {
+                        if (confirm('Are you sure you want to delete this Special Task?')) {
+                          useSpecialTaskStore.getState().deleteTask(st.id)
+                          onClose()
+                        }
+                      }}
+                      className="w-full rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 transition-colors shadow-sm"
+                    >
+                      Delete Special Task
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

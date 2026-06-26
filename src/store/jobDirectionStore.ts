@@ -9,6 +9,7 @@ interface JobDirectionStore {
   fetchDirections: () => Promise<void>
   fetchMilestones: () => Promise<void>
   fetchAll: () => Promise<void>
+  subscribeToRealtime: () => () => void
 
   addDirection: (jd: Omit<JobDirection, 'id' | 'daily_completed' | 'weekly_completed' | 'monthly_completed'>) => Promise<void>
   deleteDirection: (id: string) => Promise<void>
@@ -136,7 +137,7 @@ export const useJobDirectionStore = create<JobDirectionStore>((set, get) => ({
   },
 
   approveDirection: async (id, _managerId, notes) => {
-    await get().updateDirection(id, { status: 'approved', remarks: notes })
+    await get().updateDirection(id, { status: 'active', remarks: notes })
   },
 
   rejectDirection: async (id, notes) => {
@@ -222,10 +223,19 @@ export const useJobDirectionStore = create<JobDirectionStore>((set, get) => ({
   },
 
   approveTopDownJD: async (id, _verifierId, notes) => {
-    await get().updateDirection(id, { status: 'approved', remarks: notes ?? null })
+    await get().updateDirection(id, { status: 'active', remarks: notes ?? null })
   },
 
   rejectTopDownJD: async (id, _verifierId, notes) => {
     await get().updateDirection(id, { status: 'rejected', remarks: notes ?? null })
+  },
+
+  subscribeToRealtime: () => {
+    const channel = supabase
+      .channel('job-directions-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_directions' }, () => get().fetchDirections())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_direction_progress_logs' }, () => get().fetchDirections())
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
   },
 }))
