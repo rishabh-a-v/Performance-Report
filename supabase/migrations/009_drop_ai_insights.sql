@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS ai_insights CASCADE;
+DROP TYPE IF EXISTS ai_scope;
