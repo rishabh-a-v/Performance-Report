@@ -863,26 +863,73 @@ export function SpecialTasks() {
               {teamSearch || teamEmployee !== 'all' ? 'No tasks match your filters.' : 'No team tasks yet.'}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/50">
-                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Task</th>
-                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Assigned To</th>
-                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Assigned By</th>
-                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Date Assigned</th>
-                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Due Date</th>
-                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Status</th>
-                    <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTeam.map((task) => (
-                    <TeamTaskRow key={task.id} task={task} onClick={() => setSelectedDetail({ kind: 'st', data: task })} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* Mobile: card list */}
+              <div className="divide-y divide-slate-100 sm:hidden">
+                {filteredTeam.map((task) => {
+                  const assignees = (task.assignees ?? []).map((a) => profiles.find((p) => p.id === a.employee_id)).filter(Boolean) as typeof profiles
+                  const assignedBy = profiles.find((p) => p.id === task.assigned_by)
+                  const today2 = new Date().toISOString().slice(0, 10)
+                  const isOverdue = task.due_date && task.due_date < today2 && task.status !== 'Completed' && task.status !== 'In review'
+                  return (
+                    <div key={task.id} onClick={() => setSelectedDetail({ kind: 'st', data: task })} className="px-4 py-3 hover:bg-slate-50/70 cursor-pointer active:bg-slate-100">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={cn('text-sm font-semibold leading-snug flex-1', task.status === 'Completed' ? 'line-through text-slate-400' : 'text-slate-800')}>
+                          {task.task_name}
+                        </p>
+                        <span className={cn('shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold whitespace-nowrap', STATUS_COLORS[task.status])}>
+                          {STATUS_LABELS[task.status]}
+                        </span>
+                      </div>
+                      {task.remarks && (
+                        <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">{task.remarks}</p>
+                      )}
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                        {assignees.length > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Avatar name={assignees[0].full_name} size="xs" />
+                            {assignees.length === 1 ? assignees[0].full_name : `${assignees[0].full_name} +${assignees.length - 1}`}
+                          </span>
+                        )}
+                        {assignedBy && <span className="text-slate-400">By {assignedBy.full_name}</span>}
+                        {task.due_date && (
+                          <span className={isOverdue ? 'text-red-500 font-semibold' : ''}>
+                            Due {formatDate(task.due_date)}{isOverdue ? ' · Overdue' : ''}
+                          </span>
+                        )}
+                      </div>
+                      {task.approval_status === 'pending' && (
+                        <span className="mt-1.5 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                          Pending Approval
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Desktop: table */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/50">
+                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Task</th>
+                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Assigned To</th>
+                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Assigned By</th>
+                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Date Assigned</th>
+                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Due Date</th>
+                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Status</th>
+                      <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTeam.map((task) => (
+                      <TeamTaskRow key={task.id} task={task} onClick={() => setSelectedDetail({ kind: 'st', data: task })} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )
         )}
       </div>
