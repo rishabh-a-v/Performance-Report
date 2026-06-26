@@ -136,6 +136,12 @@ export interface JDHistoryRow {
   status: string
 }
 
+export interface SpecialTaskPendingChanges {
+  task_name?: string
+  due_date?: string | null
+  remarks?: string | null
+}
+
 export interface SpecialTask {
   id: string
   created_at: string
@@ -149,6 +155,7 @@ export interface SpecialTask {
   approval_by?: string | null
   approval_at?: string | null
   rejection_note?: string | null
+  pending_changes?: SpecialTaskPendingChanges | null
   // joined from task_assignees
   assignees?: Array<{ employee_id: string; assigned_at: string }>
 }

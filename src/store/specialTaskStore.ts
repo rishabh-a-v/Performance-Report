@@ -140,9 +140,14 @@ export const useSpecialTaskStore = create<SpecialTaskStore>((set, get) => ({
 
   approveTaskDetailChange: async (id, verifierId) => {
     const now = new Date().toISOString()
+    const task = get().tasks.find((t) => t.id === id)
+    const proposed = task?.pending_changes ?? {}
+
     const { error } = await supabase
       .from('special_tasks')
       .update({
+        ...proposed,
+        pending_changes: null,
         approval_status: 'approved',
         approval_by: verifierId,
         approval_at: now,
@@ -160,6 +165,8 @@ export const useSpecialTaskStore = create<SpecialTaskStore>((set, get) => ({
         t.id === id
           ? {
               ...t,
+              ...proposed,
+              pending_changes: null,
               approval_status: 'approved',
               approval_by: verifierId,
               approval_at: now,
@@ -184,6 +191,7 @@ export const useSpecialTaskStore = create<SpecialTaskStore>((set, get) => ({
     const { error } = await supabase
       .from('special_tasks')
       .update({
+        pending_changes: null,
         approval_status: 'rejected',
         approval_by: verifierId,
         approval_at: now,
@@ -201,6 +209,7 @@ export const useSpecialTaskStore = create<SpecialTaskStore>((set, get) => ({
         t.id === id
           ? {
               ...t,
+              pending_changes: null,
               approval_status: 'rejected',
               approval_by: verifierId,
               approval_at: now,

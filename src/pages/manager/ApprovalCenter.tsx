@@ -533,20 +533,50 @@ function TaskDetailBlock({
   task: SpecialTask
   assigner?: ReturnType<typeof useProfileStore['getState']>['profiles'][number]
 }) {
+  const proposed = task.pending_changes
   return (
-    <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 space-y-1.5">
-      <p className="text-sm text-slate-800 font-medium leading-relaxed">{task.task_name}</p>
-      <div className="flex items-center gap-3 text-xs text-slate-500">
+    <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 space-y-2">
+      {/* Task name */}
+      {proposed?.task_name !== undefined && proposed.task_name !== task.task_name ? (
+        <div className="space-y-0.5">
+          <p className="text-xs text-slate-400 line-through">{task.task_name}</p>
+          <p className="text-sm text-slate-800 font-medium leading-relaxed">{proposed.task_name}</p>
+        </div>
+      ) : (
+        <p className="text-sm text-slate-800 font-medium leading-relaxed">{task.task_name}</p>
+      )}
+
+      <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
         {assigner && (
           <span className="flex items-center gap-1">
             <Clock size={11} /> Assigned by <strong className="text-slate-700">{assigner.full_name}</strong>
           </span>
         )}
-        {task.due_date && (
+        {/* Due date: show before → after when changed */}
+        {proposed && 'due_date' in proposed ? (
+          <span className="flex items-center gap-1.5">
+            <span className="line-through text-slate-400">{task.due_date ?? 'No due date'}</span>
+            <span>→</span>
+            <strong className="text-slate-700">{proposed.due_date ?? 'No due date'}</strong>
+          </span>
+        ) : task.due_date ? (
           <span>Due <strong className="text-slate-700">{task.due_date}</strong></span>
-        )}
+        ) : null}
       </div>
-      {task.remarks && <p className="text-xs text-slate-400 italic">{task.remarks}</p>}
+
+      {/* Remarks */}
+      {proposed?.remarks !== undefined && proposed.remarks !== task.remarks ? (
+        <div className="space-y-0.5">
+          {task.remarks && <p className="text-xs text-slate-400 line-through italic">{task.remarks}</p>}
+          {proposed.remarks && <p className="text-xs text-slate-500 italic">{proposed.remarks}</p>}
+        </div>
+      ) : task.remarks ? (
+        <p className="text-xs text-slate-400 italic">{task.remarks}</p>
+      ) : null}
+
+      {proposed && (
+        <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Proposed changes shown above</p>
+      )}
     </div>
   )
 }

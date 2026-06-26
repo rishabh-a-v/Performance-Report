@@ -103,13 +103,24 @@ export function TaskDetailModal({ item, onClose }: Props) {
       const isAssignee = st?.assignees?.some((a) => a.employee_id === user?.id)
       const isAssigner = st?.assigned_by === user?.id
       const needsApproval = isAssignee && !isAssigner
-      const approvalUpdate = needsApproval ? { approval_status: 'pending' as const } : { approval_status: 'approved' as const }
-      useSpecialTaskStore.getState().updateTask(item.data.id, {
-        task_name: editTaskName.trim(),
-        due_date: editDueDate || null,
-        remarks: editRemarks.trim() || null,
-        ...approvalUpdate,
-      })
+      if (needsApproval) {
+        useSpecialTaskStore.getState().updateTask(item.data.id, {
+          pending_changes: {
+            task_name: editTaskName.trim(),
+            due_date: editDueDate || null,
+            remarks: editRemarks.trim() || null,
+          },
+          approval_status: 'pending',
+        })
+      } else {
+        useSpecialTaskStore.getState().updateTask(item.data.id, {
+          task_name: editTaskName.trim(),
+          due_date: editDueDate || null,
+          remarks: editRemarks.trim() || null,
+          pending_changes: null,
+          approval_status: 'approved',
+        })
+      }
     }
     setIsEditing(false)
     onClose()
