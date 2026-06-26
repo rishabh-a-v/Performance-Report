@@ -73,8 +73,9 @@ function KPICard({ label, value, color }: { label: string; value: number; color:
 // ─── Task Row (my tasks) ───────────────────────────────────────────────────────
 
 function TaskRow({ task, onClick }: { task: SpecialTask; onClick?: () => void }) {
-  const { setStatus } = useSpecialTaskStore()
+  const { setStatus, deleteTask } = useSpecialTaskStore()
   const { user } = useAuth()
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const profiles = useProfileStore((s) => s.profiles)
   const assignedBy = profiles.find((p) => p.id === task.assigned_by)
   const today = new Date().toISOString().slice(0, 10)
@@ -151,7 +152,7 @@ function TaskRow({ task, onClick }: { task: SpecialTask; onClick?: () => void })
           )}
         </div>
       </td>
-      <td className="py-4 px-5 whitespace-nowrap text-right">
+      <td className="py-4 px-5 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-2">
           {isAssigner && task.status === 'In review' && (
             <button
@@ -166,6 +167,33 @@ function TaskRow({ task, onClick }: { task: SpecialTask; onClick?: () => void })
             <button onClick={handleToggle} className="text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors">
               Undo Submit
             </button>
+          )}
+          {isAssigner && (
+            confirmDelete ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-red-600 font-medium">Delete?</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteTask(task.id); setConfirmDelete(false) }}
+                  className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 transition-colors"
+                >
+                  Yes
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setConfirmDelete(false) }}
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
+                >
+                  No
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); setConfirmDelete(true) }}
+                className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors"
+              >
+                <Trash2 size={11} />
+                Delete
+              </button>
+            )
           )}
         </div>
       </td>
@@ -356,12 +384,13 @@ export function AddTaskModal({ open, onClose, defaultAssigneeId }: AddTaskModalP
     if (!taskName.trim()) { setError('Task name is required.'); return }
     if (assigneeIds.length === 0) { setError('Select at least one assignee.'); return }
 
+    const isSelfOnly = assigneeIds.length === 1 && assigneeIds[0] === user?.id
     addTask({
       task_name: taskName.trim(),
       remarks: remarks.trim() || null,
       assigned_by: user?.id ?? '',
       due_date: dueDate || null,
-      status: 'Yet to start',
+      status: isSelfOnly ? 'In progress' : 'Yet to start',
     }, assigneeIds)
 
     // Reset
@@ -453,7 +482,7 @@ export function AddTaskModal({ open, onClose, defaultAssigneeId }: AddTaskModalP
 
           <Input
             id="st-due"
-            label="Due Date"
+            label="Due Date (optional)"
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}

@@ -4,7 +4,7 @@ import { useJobDirectionStore } from '@/store/jobDirectionStore'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
 import {
-  Trash2, Plus, X, ClipboardList, Users, Search, ChevronUp, ChevronDown, ChevronsUpDown,
+  Trash2, Plus, X, ClipboardList, Users, Search, ChevronUp, ChevronDown, ChevronsUpDown, History,
 } from 'lucide-react'
 import { useRBACFilter } from '@/hooks/useRBACFilter'
 import { useUISchema } from '@/hooks/useUISchema'
@@ -20,7 +20,7 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
     ? <ChevronUp size={12} className="text-blue-500 ml-1 inline shrink-0" />
     : <ChevronDown size={12} className="text-blue-500 ml-1 inline shrink-0" />
 }
-import type { JobDirection } from '@/types/database'
+import type { JobDirection, JDHistoryRow } from '@/types/database'
 import { Button } from '@/components/ui/Button'
 import { Input, Textarea } from '@/components/ui/Input'
 import {
@@ -46,7 +46,6 @@ const ROLE_ORDER: Record<string, number> = {
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, string> = {
-  draft:               'bg-slate-100 text-slate-500',
   active:              'bg-blue-100 text-blue-700',
   submitted:           'bg-amber-100 text-amber-700',
   approved:            'bg-emerald-100 text-emerald-700',
@@ -56,7 +55,6 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  draft:               'Draft',
   active:              'Active',
   submitted:           'Under Review',
   approved:            'Approved',
@@ -81,7 +79,6 @@ function KPICard({ label, value, color }: { label: string; value: number; color:
 function ProgressBar({ completed, target, status }: { completed: number; target: number; status: string }) {
   const pct = target > 0 ? (completed / target) * 100 : 0
   const color = {
-    draft:     'bg-slate-400',
     active:    'bg-blue-500',
     submitted: 'bg-amber-500',
     approved:  'bg-emerald-500',
@@ -137,6 +134,9 @@ function DirectionRow({
         <p className={cn('text-sm font-medium leading-snug truncate', jd.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-800')}>
           {jd.work_details || '—'}
         </p>
+        {jd.description && (
+          <p className="text-xs text-slate-400 truncate mt-0.5">{jd.description}</p>
+        )}
       </td>
 
       {/* Daily Progress */}
@@ -220,6 +220,9 @@ function TeamDirectionRow({ jd, onClick }: { jd: JobDirection; onClick?: () => v
         <p className={cn('text-sm font-medium leading-snug truncate', jd.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-800')}>
           {jd.work_details || '—'}
         </p>
+        {jd.description && (
+          <p className="text-xs text-slate-400 truncate mt-0.5">{jd.description}</p>
+        )}
       </td>
       <td className="py-4 px-5 whitespace-nowrap">
         <div className="flex items-center gap-2">
@@ -287,6 +290,7 @@ function TeamDirectionRow({ jd, onClick }: { jd: JobDirection; onClick?: () => v
 
 const EMPTY_FORM = {
   work_details: '',
+  description: '',
   daily_target: '',
   weekly_target: '',
   monthly_target: '',
@@ -375,6 +379,7 @@ export function AddDirectionModal({ open, onClose, defaultAssigneeId }: AddDirec
 
     addDirection({
       work_details:     form.work_details.trim(),
+      description:      form.description.trim() || null,
       daily_target:     dailyTarget,
       weekly_target:    weeklyTarget,
       monthly_target:   monthlyTarget,
@@ -465,6 +470,15 @@ export function AddDirectionModal({ open, onClose, defaultAssigneeId }: AddDirec
             error={error && form.work_details.trim() === '' ? error : undefined}
           />
 
+          <Textarea
+            id="jd-description"
+            label="Description"
+            placeholder="Add more context or details (optional)..."
+            rows={3}
+            value={form.description}
+            onChange={(e) => setField('description', e.target.value)}
+          />
+
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Targets</h4>
@@ -537,28 +551,51 @@ export function AddDirectionModal({ open, onClose, defaultAssigneeId }: AddDirec
 
 // ─── Filter tabs ───────────────────────────────────────────────────────────────
 
-type FilterTab = 'all' | 'draft' | 'active' | 'deletion_requested'
+type FilterTab = 'all' | 'active' | 'deletion_requested'
 
 const FILTER_TABS: { label: string; value: FilterTab }[] = [
   { label: 'All',                value: 'all' },
-  { label: 'Draft',              value: 'draft' },
   { label: 'Active',             value: 'active' },
   { label: 'Deletion Requested',  value: 'deletion_requested' },
 ]
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
-type ViewMode = 'mine' | 'team'
+type ViewMode = 'mine' | 'team' | 'history'
+
+function getDefaultHistoryMonth() {
+  const now = new Date()
+  return now.getMonth() === 0
+    ? { year: now.getFullYear() - 1, month: 12 }
+    : { year: now.getFullYear(), month: now.getMonth() }
+}
 
 export function JobDirections() {
   const { user } = useAuth()
-  const allDirections = useJobDirectionStore((s) => s.directions)
-  const profiles      = useProfileStore((s) => s.profiles)
+  const allDirections  = useJobDirectionStore((s) => s.directions)
+  const fetchHistory   = useJobDirectionStore((s) => s.fetchMonthlyHistory)
+  const profiles       = useProfileStore((s) => s.profiles)
 
   const location = useLocation()
 
   const [showAdd, setShowAdd]           = useState(false)
   const [viewMode, setViewMode]         = useState<ViewMode>('mine')
+
+  // ── History state ──
+  const [histYear,     setHistYear]     = useState(() => getDefaultHistoryMonth().year)
+  const [histMonth,    setHistMonth]    = useState(() => getDefaultHistoryMonth().month)
+  const [histData,     setHistData]     = useState<JDHistoryRow[]>([])
+  const [histLoading,  setHistLoading]  = useState(false)
+  const [histEmployee, setHistEmployee] = useState('all')
+
+  useEffect(() => {
+    if (viewMode !== 'history') return
+    setHistLoading(true)
+    fetchHistory(histYear, histMonth).then((rows) => {
+      setHistData(rows)
+      setHistLoading(false)
+    })
+  }, [viewMode, histYear, histMonth, fetchHistory])
 
   useEffect(() => {
     const state = location.state as { view?: string } | null
@@ -594,7 +631,7 @@ export function JobDirections() {
   const approvedCount  = myDirections.filter((d) => ['active', 'completed', 'approved'].includes(d.status)).length
   const completedCount = myDirections.filter((d) => d.status === 'completed').length
 
-  const JD_STATUS_ORDER: Record<string, number> = { draft: 0, active: 1, submitted: 2, approved: 3, rejected: 4, completed: 5 }
+  const JD_STATUS_ORDER: Record<string, number> = { active: 0, submitted: 1, approved: 2, rejected: 3, completed: 4 }
 
   const filteredMineBase = useMemo(() => {
     if (filterTab === 'all') return myDirections
@@ -694,6 +731,18 @@ export function JobDirections() {
               {activeTeam}
             </span>
           )}
+        </button>
+        <button
+          onClick={() => setViewMode('history')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px',
+            viewMode === 'history'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          )}
+        >
+          <History size={15} />
+          History
         </button>
       </div>
 
@@ -860,6 +909,149 @@ export function JobDirections() {
             </>
           )
         )}
+
+        {/* History */}
+        {viewMode === 'history' && (() => {
+          const now = new Date()
+          const monthOptions: { year: number; month: number; label: string }[] = []
+          for (let i = 1; i <= 12; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+            monthOptions.push({
+              year:  d.getFullYear(),
+              month: d.getMonth() + 1,
+              label: d.toLocaleString('default', { month: 'long', year: 'numeric' }),
+            })
+          }
+
+          const myHistory   = histData.filter((r) => r.employee_id === user?.id)
+          const teamHistory = histData.filter((r) => r.employee_id !== user?.id)
+          const histTeamPeople = [...new Map(teamHistory.map((r) => [r.employee_id, r.employee_name])).entries()]
+
+          const filteredTeamHistory = histEmployee === 'all'
+            ? teamHistory
+            : teamHistory.filter((r) => r.employee_id === histEmployee)
+
+          function HistoryTable({ rows }: { rows: JDHistoryRow[] }) {
+            if (rows.length === 0) {
+              return <p className="px-6 py-8 text-center text-sm text-slate-400">No data for this month.</p>
+            }
+            return (
+              <table className="min-w-full">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/50">
+                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Work Details</th>
+                    {histTeamPeople.length > 0 && rows === filteredTeamHistory && (
+                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-40">Employee</th>
+                    )}
+                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-32">Monthly Target</th>
+                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-32">Achieved</th>
+                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-44">Completion</th>
+                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-28">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {rows.map((row) => {
+                    const pct = row.monthly_target > 0
+                      ? Math.min(100, (row.monthly_achieved / row.monthly_target) * 100)
+                      : null
+                    const barColor = pct === null ? 'bg-slate-300'
+                      : pct >= 100 ? 'bg-emerald-500'
+                      : pct >= 60  ? 'bg-blue-500'
+                      : 'bg-amber-400'
+                    return (
+                      <tr key={row.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-3 px-5 text-sm text-slate-800 max-w-[260px]">
+                          <span className="line-clamp-2">{row.work_details || '—'}</span>
+                        </td>
+                        {histTeamPeople.length > 0 && rows === filteredTeamHistory && (
+                          <td className="py-3 px-5 text-sm text-slate-600 whitespace-nowrap">{row.employee_name}</td>
+                        )}
+                        <td className="py-3 px-5 text-sm tabular-nums text-slate-600">
+                          {row.monthly_target > 0 ? row.monthly_target : <span className="text-slate-300">—</span>}
+                        </td>
+                        <td className="py-3 px-5 text-sm tabular-nums font-semibold text-slate-800">
+                          {row.monthly_achieved > 0 ? row.monthly_achieved : <span className="text-slate-300 font-normal">0</span>}
+                        </td>
+                        <td className="py-3 px-5">
+                          {pct !== null ? (
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 rounded-full bg-slate-100">
+                                <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-xs font-semibold tabular-nums text-slate-600 w-9 text-right shrink-0">
+                                {pct.toFixed(0)}%
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-300">No target</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-5">
+                          <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', STATUS_COLORS[row.status] ?? 'bg-slate-100 text-slate-500')}>
+                            {STATUS_LABELS[row.status] ?? row.status}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )
+          }
+
+          return (
+            <div>
+              {/* Controls */}
+              <div className="border-b border-slate-100 px-4 py-3 flex flex-wrap items-center gap-3">
+                <select
+                  value={`${histYear}-${histMonth}`}
+                  onChange={(e) => {
+                    const [y, m] = e.target.value.split('-').map(Number)
+                    setHistYear(y); setHistMonth(m)
+                  }}
+                  className="rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm text-slate-700 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                >
+                  {monthOptions.map((o) => (
+                    <option key={`${o.year}-${o.month}`} value={`${o.year}-${o.month}`}>{o.label}</option>
+                  ))}
+                </select>
+                {histTeamPeople.length > 0 && (
+                  <select
+                    value={histEmployee}
+                    onChange={(e) => setHistEmployee(e.target.value)}
+                    className="rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm text-slate-700 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                  >
+                    <option value="all">All employees</option>
+                    {histTeamPeople.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                  </select>
+                )}
+                {histLoading && <span className="text-xs text-slate-400 animate-pulse">Loading…</span>}
+              </div>
+
+              {histLoading ? (
+                <div className="px-6 py-10 text-center text-sm text-slate-400 animate-pulse">Fetching history…</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  {/* My section */}
+                  <div className="px-5 pt-4 pb-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">My Directions</p>
+                  </div>
+                  <HistoryTable rows={myHistory} />
+
+                  {/* Team section — only if there's team data */}
+                  {teamHistory.length > 0 && (
+                    <>
+                      <div className="px-5 pt-5 pb-1 border-t border-slate-100">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Team</p>
+                      </div>
+                      <HistoryTable rows={filteredTeamHistory} />
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Team directions */}
         {viewMode === 'team' && (

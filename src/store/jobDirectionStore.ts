@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
-import type { JobDirection } from '@/types/database'
+import type { JobDirection, JDHistoryRow } from '@/types/database'
 
 interface JobDirectionStore {
   directions: JobDirection[]
@@ -27,6 +27,7 @@ interface JobDirectionStore {
   requestChanges: (id: string, notes: string) => Promise<void>
   toggleMilestone: (milestoneId: string) => Promise<void>
   updateDirection: (id: string, updates: Partial<JobDirection>) => Promise<void>
+  fetchMonthlyHistory: (year: number, month: number) => Promise<JDHistoryRow[]>
   getDirectionsForEmployee: (employeeId: string) => JobDirection[]
   getPendingForManager: (managerId: string) => JobDirection[]
   getMilestonesForDirection: (jdId: string) => any[]
@@ -202,6 +203,18 @@ export const useJobDirectionStore = create<JobDirectionStore>((set, get) => ({
         d.id === id ? { ...d, ...updates } : d
       ),
     }))
+  },
+
+  fetchMonthlyHistory: async (year, month) => {
+    const { data, error } = await supabase.rpc('get_jd_monthly_history', {
+      p_year: year,
+      p_month: month,
+    })
+    if (error) {
+      console.error('Error fetching JD history:', error)
+      return []
+    }
+    return (data ?? []) as JDHistoryRow[]
   },
 
   getDirectionsForEmployee: (employeeId) => {

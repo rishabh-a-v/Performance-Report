@@ -110,6 +110,7 @@ export interface Profile {
 export interface JobDirection {
   id: string
   work_details: string | null
+  description: string | null
   daily_target: number
   weekly_target: number
   monthly_target: number
@@ -123,6 +124,16 @@ export interface JobDirection {
   department_id: string | null
   created_at?: string
   updated_at?: string
+}
+
+export interface JDHistoryRow {
+  id: string
+  work_details: string | null
+  monthly_target: number
+  monthly_achieved: number
+  employee_id: string
+  employee_name: string
+  status: string
 }
 
 export interface SpecialTask {

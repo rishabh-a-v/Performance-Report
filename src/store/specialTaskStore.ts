@@ -54,12 +54,11 @@ export const useSpecialTaskStore = create<SpecialTaskStore>((set, get) => ({
 
   addTask: async (taskData, assignee_ids) => {
     const now = new Date().toISOString()
-    const isSelfAssigned = assignee_ids.includes(taskData.assigned_by)
     const { data, error } = await supabase
       .from('special_tasks')
       .insert({
         ...taskData,
-        approval_status: isSelfAssigned ? 'pending' : 'approved',
+        approval_status: 'approved',
       })
       .select()
       .single()
