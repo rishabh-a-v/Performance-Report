@@ -101,7 +101,9 @@ export function TaskDetailModal({ item, onClose }: Props) {
       })
     } else {
       const isAssignee = st?.assignees?.some((a) => a.employee_id === user?.id)
-      const approvalUpdate = isAssignee ? { approval_status: 'pending' as const } : {}
+      const isAssigner = st?.assigned_by === user?.id
+      const needsApproval = isAssignee && !isAssigner
+      const approvalUpdate = needsApproval ? { approval_status: 'pending' as const } : { approval_status: 'approved' as const }
       useSpecialTaskStore.getState().updateTask(item.data.id, {
         task_name: editTaskName.trim(),
         due_date: editDueDate || null,
