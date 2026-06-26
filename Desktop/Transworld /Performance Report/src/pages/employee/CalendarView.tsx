@@ -5,47 +5,35 @@ import {
   isSameMonth, isToday, isSameDay, format, parseISO,
 } from 'date-fns'
 import { useAuth } from '@/contexts/AuthContext'
-import { useJobDirectionStore } from '@/store/jobDirectionStore'
 import { useSpecialTaskStore } from '@/store/specialTaskStore'
 import { cn } from '@/lib/utils'
-import type { JobDirection, SpecialTask } from '@/types/database'
-import { ChevronLeft, ChevronRight, Compass, ListTodo } from 'lucide-react'
+import type { SpecialTask } from '@/types/database'
+import { ChevronLeft, ChevronRight, ListTodo } from 'lucide-react'
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-const JD_PILL: Record<string, string> = {
-  active:    'bg-blue-50 text-blue-700',
-  submitted: 'bg-amber-50 text-amber-700',
-  approved:  'bg-emerald-50 text-emerald-700',
-  rejected:  'bg-red-50 text-red-700',
-  completed: 'bg-slate-100 text-slate-500 line-through',
-  draft:     'bg-slate-100 text-slate-500',
-}
-
 const ST_PILL: Record<string, string> = {
-  pending:     'bg-slate-100 text-slate-600',
-  in_progress: 'bg-blue-50 text-blue-700',
-  on_hold:     'bg-amber-50 text-amber-700',
-  completed:   'bg-emerald-50 text-emerald-700 line-through',
+  'Yet to start': 'bg-slate-100 text-slate-600',
+  'In progress':  'bg-blue-50 text-blue-700',
+  Completed:    'bg-emerald-50 text-emerald-700 line-through',
+  Cancelled:    'bg-red-50 text-red-600',
+  Acknowledged: 'bg-teal-50 text-teal-700',
 }
 
 type DayItem =
-  | { kind: 'jd'; data: JobDirection }
   | { kind: 'st'; data: SpecialTask }
 
 export function CalendarView() {
   const { user } = useAuth()
-  const allJDs = useJobDirectionStore((s) => s.directions)
   const allSTs = useSpecialTaskStore((s) => s.tasks)
   const [month, setMonth] = useState(() => startOfMonth(new Date()))
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
-  const [selectedDetail, setSelectedDetail] = useState<{ kind: 'jd'; data: JobDirection } | { kind: 'st'; data: SpecialTask } | null>(null)
+  const [selectedDetail, setSelectedDetail] = useState<{ kind: 'st'; data: SpecialTask } | null>(null)
 
   if (!user) return null
 
-  const myJDs = allJDs.filter((jd) => jd.employee_id === user.id && jd.due_date)
-  const mySTs = allSTs.filter((st) => st.assigned_to === user.id && st.due_date)
+  const mySTs = allSTs.filter((st) => st.assignees?.some((a) => a.employee_id === user.id) && st.due_date)
 
   const days = eachDayOfInterval({
     start: startOfWeek(startOfMonth(month)),
@@ -53,13 +41,10 @@ export function CalendarView() {
   })
 
   function itemsForDay(day: Date): DayItem[] {
-    const jdItems: DayItem[] = myJDs
-      .filter((jd) => jd.due_date && isSameDay(parseISO(jd.due_date), day))
-      .map((jd) => ({ kind: 'jd' as const, data: jd }))
     const stItems: DayItem[] = mySTs
       .filter((st) => st.due_date && isSameDay(parseISO(st.due_date), day))
       .map((st) => ({ kind: 'st' as const, data: st }))
-    return [...stItems, ...jdItems]
+    return stItems
   }
 
   const dayItems = selectedDay ? itemsForDay(selectedDay) : []
@@ -90,11 +75,7 @@ export function CalendarView() {
             Today
           </button>
         </div>
-        <div className="flex items-center gap-4 text-[10px] font-medium text-slate-500">
-          <div className="flex items-center gap-1.5">
-            <Compass size={11} className="text-blue-500" />
-            <span>Job Direction</span>
-          </div>
+        <div className="hidden sm:flex items-center gap-4 text-[10px] font-medium text-slate-500">
           <div className="flex items-center gap-1.5">
             <ListTodo size={11} className="text-slate-500" />
             <span>Special Task</span>
@@ -152,16 +133,14 @@ export function CalendarView() {
                         }}
                         className={cn(
                           'flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium truncate cursor-pointer hover:opacity-85',
-                          item.kind === 'jd'
-                            ? JD_PILL[item.data.status] ?? 'bg-blue-50 text-blue-700'
-                            : ST_PILL[(item.data as SpecialTask).status] ?? 'bg-slate-100 text-slate-600',
+                          ST_PILL[item.data.status] ?? 'bg-slate-100 text-slate-600',
                         )}
-                        title={item.data.title}
+                        title={item.data.task_name}
                       >
-                        {item.kind === 'jd'
-                          ? <Compass size={9} className="shrink-0 opacity-60" />
-                          : <ListTodo size={9} className="shrink-0 opacity-60" />}
-                        <span className="truncate">{item.data.title}</span>
+                        <ListTodo size={9} className="shrink-0 opacity-60" />
+                        <span className="truncate">
+                          {item.data.task_name}
+                        </span>
                       </div>
                     ))}
                     {items.length > 3 && (
@@ -188,16 +167,8 @@ export function CalendarView() {
                   <div className="px-4 py-6 text-center text-[11px] text-slate-400">Nothing due on this day.</div>
                 ) : (
                   dayItems.map((item) => {
-                    const isJD = item.kind === 'jd'
-                    const jd = isJD ? (item.data as JobDirection) : null
-                    const st = !isJD ? (item.data as SpecialTask) : null
-                    const statusLabel = isJD
-                      ? jd!.status === 'submitted' ? 'Under Review'
-                        : jd!.status === 'rejected' ? 'Changes Needed'
-                        : jd!.status.charAt(0).toUpperCase() + jd!.status.slice(1)
-                      : st!.status === 'in_progress' ? 'In Progress'
-                        : st!.status === 'on_hold' ? 'On Hold'
-                        : st!.status.charAt(0).toUpperCase() + st!.status.slice(1)
+                    const st = item.data
+                    const statusLabel = st.status
 
                     return (
                       <div 
@@ -206,26 +177,20 @@ export function CalendarView() {
                         className="px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer"
                       >
                         <div className="flex items-start gap-2.5">
-                          <div className={cn(
-                            'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded',
-                            isJD ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500',
-                          )}>
-                            {isJD ? <Compass size={10} /> : <ListTodo size={10} />}
+                          <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-slate-100 text-slate-500">
+                            <ListTodo size={10} />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-[11px] font-semibold text-slate-800 leading-snug">{item.data.title}</p>
+                            <p className="text-[11px] font-semibold text-slate-800 leading-snug">
+                              {item.data.task_name}
+                            </p>
                             <div className="mt-1 flex items-center gap-1.5">
                               <span className={cn(
                                 'inline-block rounded-full px-1.5 py-px text-[9px] font-bold',
-                                isJD ? JD_PILL[jd!.status] : ST_PILL[st!.status],
+                                ST_PILL[st.status],
                               )}>
                                 {statusLabel}
                               </span>
-                              {isJD && (
-                                <span className="text-[9px] text-slate-400 font-medium">
-                                  {jd!.progress_percentage.toFixed(0)}%
-                                </span>
-                              )}
                             </div>
                           </div>
                         </div>

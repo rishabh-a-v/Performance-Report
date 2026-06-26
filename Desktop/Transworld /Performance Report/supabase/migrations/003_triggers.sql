@@ -43,6 +43,10 @@ BEGIN
     NEW.completed_at = NOW();
   END IF;
 
+  IF NEW.started_at IS NOT NULL AND NEW.completed_at IS NOT NULL THEN
+    NEW.cycle_time_hours = EXTRACT(EPOCH FROM (NEW.completed_at - NEW.started_at)) / 3600;
+  END IF;
+
   -- Unblock task when status changes away from blocked
   IF OLD.status = 'blocked' AND NEW.status != 'blocked' THEN
     UPDATE blockers
@@ -209,7 +213,7 @@ BEGIN
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
-    COALESCE((NEW.raw_user_meta_data->>'role')::user_role, 'employee')
+    COALESCE((NEW.raw_user_meta_data->>'role')::user_role, 'executive')
   )
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
@@ -219,3 +223,20 @@ $$;
 CREATE TRIGGER trg_new_user
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- Blocker lifecycle trigger to maintain hours_blocked
+CREATE OR REPLACE FUNCTION blocker_lifecycle()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.resolved_at IS NOT NULL THEN
+    NEW.hours_blocked = EXTRACT(EPOCH FROM (NEW.resolved_at - NEW.reported_at)) / 3600;
+  ELSE
+    NEW.hours_blocked = EXTRACT(EPOCH FROM (NOW() - NEW.reported_at)) / 3600;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_blocker_lifecycle
+  BEFORE INSERT OR UPDATE ON blockers
+  FOR EACH ROW EXECUTE FUNCTION blocker_lifecycle();

@@ -46,21 +46,23 @@ CREATE TRIGGER trg_milestone_progress
   AFTER INSERT OR UPDATE OR DELETE ON milestones
   FOR EACH ROW EXECUTE FUNCTION sync_milestone_progress();
 
--- Trigger: value-model progress_percentage
-CREATE OR REPLACE FUNCTION sync_value_progress()
+-- Trigger: quantity/value model progress_percentage
+CREATE OR REPLACE FUNCTION sync_task_progress()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-  IF NEW.progress_model = 'value' AND NEW.target_value IS NOT NULL AND NEW.target_value > 0 THEN
-    NEW.progress_percentage := ROUND((COALESCE(NEW.current_value,0) / NEW.target_value) * 100, 2);
+  IF NEW.progress_model = 'quantity' AND NEW.target_quantity IS NOT NULL AND NEW.target_quantity > 0 THEN
+    NEW.progress_percentage := ROUND((COALESCE(NEW.completed_quantity, 0) / NEW.target_quantity) * 100, 2);
+  ELSIF NEW.progress_model = 'value' AND NEW.target_value IS NOT NULL AND NEW.target_value > 0 THEN
+    NEW.progress_percentage := ROUND((COALESCE(NEW.current_value, 0) / NEW.target_value) * 100, 2);
   END IF;
   RETURN NEW;
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_value_progress ON tasks;
-CREATE TRIGGER trg_value_progress
-  BEFORE INSERT OR UPDATE OF current_value, target_value ON tasks
-  FOR EACH ROW EXECUTE FUNCTION sync_value_progress();
+DROP TRIGGER IF EXISTS trg_task_progress ON tasks;
+CREATE TRIGGER trg_task_progress
+  BEFORE INSERT OR UPDATE OF completed_quantity, target_quantity, current_value, target_value, progress_model ON tasks
+  FOR EACH ROW EXECUTE FUNCTION sync_task_progress();
 
 -- RLS
 ALTER TABLE milestones ENABLE ROW LEVEL SECURITY;
@@ -81,5 +83,5 @@ CREATE POLICY "managers_team_milestones" ON milestones
 
 CREATE POLICY "execs_all_milestones" ON milestones
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('department_head','executive'))
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('director','managing_director'))
   );

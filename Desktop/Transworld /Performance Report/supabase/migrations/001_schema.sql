@@ -10,7 +10,7 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm";   -- fast text search
 -- ─────────────────────────────────────────────────────────────
 -- ENUMs
 -- ─────────────────────────────────────────────────────────────
-CREATE TYPE user_role      AS ENUM ('employee', 'manager', 'department_head', 'executive');
+CREATE TYPE user_role      AS ENUM ('executive', 'manager', 'director', 'managing_director');
 CREATE TYPE task_status    AS ENUM ('backlog', 'ready', 'in_progress', 'blocked', 'done');
 CREATE TYPE task_priority  AS ENUM ('low', 'medium', 'high', 'critical');
 CREATE TYPE audit_status   AS ENUM ('assigned', 'in_progress', 'completed', 'pending');
@@ -67,13 +67,7 @@ CREATE TABLE tasks (
   due_date         DATE,
   started_at       TIMESTAMPTZ,
   completed_at     TIMESTAMPTZ,
-  cycle_time_hours INTEGER GENERATED ALWAYS AS (
-    CASE
-      WHEN started_at IS NOT NULL AND completed_at IS NOT NULL
-      THEN EXTRACT(EPOCH FROM (completed_at - started_at)) / 3600
-      ELSE NULL
-    END
-  ) STORED,
+  cycle_time_hours INTEGER,
   estimated_hours  INTEGER,
   tags             TEXT[] NOT NULL DEFAULT '{}',
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -124,13 +118,7 @@ CREATE TABLE blockers (
   resolved_at      TIMESTAMPTZ,
   resolved_by      UUID REFERENCES profiles(id),
   resolution_notes TEXT,
-  hours_blocked    INTEGER GENERATED ALWAYS AS (
-    CASE
-      WHEN resolved_at IS NOT NULL
-      THEN EXTRACT(EPOCH FROM (resolved_at - reported_at)) / 3600
-      ELSE EXTRACT(EPOCH FROM (NOW() - reported_at)) / 3600
-    END
-  ) STORED,
+  hours_blocked    INTEGER,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

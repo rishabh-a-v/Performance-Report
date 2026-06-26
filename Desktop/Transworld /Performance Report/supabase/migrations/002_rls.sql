@@ -65,12 +65,12 @@ CREATE POLICY "profiles: manager read reports"
 -- Dept heads can read all profiles in their dept
 CREATE POLICY "profiles: dept head read dept"
   ON profiles FOR SELECT
-  USING (department_id = auth_dept_id() AND auth_role() IN ('department_head', 'executive'));
+  USING (department_id = auth_dept_id() AND auth_role() IN ('director', 'managing_director'));
 
 -- Executives see all profiles
 CREATE POLICY "profiles: executive read all"
   ON profiles FOR SELECT
-  USING (auth_role() = 'executive');
+  USING (auth_role() = 'managing_director');
 
 -- Users can update their own profile (non-sensitive fields)
 CREATE POLICY "profiles: self update"
@@ -92,17 +92,17 @@ CREATE POLICY "tasks: manager read team tasks"
 -- Dept heads see all tasks in their department
 CREATE POLICY "tasks: dept head read dept tasks"
   ON tasks FOR SELECT
-  USING (department_id = auth_dept_id() AND auth_role() IN ('department_head', 'executive'));
+  USING (department_id = auth_dept_id() AND auth_role() IN ('director', 'managing_director'));
 
 -- Executives see all tasks
 CREATE POLICY "tasks: executive read all"
   ON tasks FOR SELECT
-  USING (auth_role() = 'executive');
+  USING (auth_role() = 'managing_director');
 
 -- Managers and above can create tasks
 CREATE POLICY "tasks: manager create"
   ON tasks FOR INSERT
-  WITH CHECK (auth_role() IN ('manager', 'department_head', 'executive'));
+  WITH CHECK (auth_role() IN ('manager', 'director', 'managing_director'));
 
 -- Employees can update status of their own tasks
 CREATE POLICY "tasks: assignee update status"
@@ -130,13 +130,13 @@ CREATE POLICY "checkins: manager read team"
 CREATE POLICY "checkins: dept head read"
   ON daily_checkins FOR SELECT
   USING (
-    auth_role() IN ('department_head', 'executive') AND
+    auth_role() IN ('director', 'managing_director') AND
     EXISTS (SELECT 1 FROM profiles p WHERE p.id = user_id AND p.department_id = auth_dept_id())
   );
 
 CREATE POLICY "checkins: executive read all"
   ON daily_checkins FOR SELECT
-  USING (auth_role() = 'executive');
+  USING (auth_role() = 'managing_director');
 
 -- Users can insert their own check-in
 CREATE POLICY "checkins: self insert"
@@ -152,7 +152,7 @@ CREATE POLICY "blockers: manager read"
 
 CREATE POLICY "blockers: dept head read"
   ON blockers FOR SELECT
-  USING (auth_role() IN ('department_head', 'executive'));
+  USING (auth_role() IN ('director', 'managing_director'));
 
 CREATE POLICY "blockers: self insert"
   ON blockers FOR INSERT WITH CHECK (employee_id = auth.uid());
@@ -169,34 +169,35 @@ CREATE POLICY "perf_snap: manager read team"
   ON performance_snapshots FOR SELECT USING (is_manager_of(user_id));
 
 CREATE POLICY "perf_snap: executive read all"
-  ON performance_snapshots FOR SELECT USING (auth_role() IN ('department_head', 'executive'));
+  ON performance_snapshots FOR SELECT USING (auth_role() IN ('director', 'managing_director'));
 
 -- ─── DEPARTMENT SNAPSHOTS ────────────────────────────────────
+-- Dept heads read their own department, executives read all
 CREATE POLICY "dept_snap: dept head read"
   ON department_snapshots FOR SELECT
   USING (
-    department_id = auth_dept_id() OR auth_role() = 'executive'
+    department_id = auth_dept_id() OR auth_role() = 'managing_director'
   );
 
 -- ─── FINANCE ─────────────────────────────────────────────────
 CREATE POLICY "invoices: finance and above"
   ON invoices FOR SELECT
-  USING (auth_role() IN ('department_head', 'executive'));
+  USING (auth_role() IN ('director', 'managing_director'));
 
 CREATE POLICY "invoices: insert finance"
   ON invoices FOR INSERT
-  WITH CHECK (auth_role() IN ('department_head', 'executive'));
+  WITH CHECK (auth_role() IN ('director', 'managing_director'));
 
 CREATE POLICY "audits: finance read"
   ON audits FOR SELECT
   USING (
     assigned_to = auth.uid() OR
-    auth_role() IN ('department_head', 'executive')
+    auth_role() IN ('director', 'managing_director')
   );
 
 CREATE POLICY "finance_kpis: finance and above"
   ON finance_kpis FOR SELECT
-  USING (auth_role() IN ('department_head', 'executive'));
+  USING (auth_role() IN ('director', 'managing_director'));
 
 -- ─── NOTIFICATIONS ───────────────────────────────────────────
 CREATE POLICY "notifications: own only"
@@ -209,5 +210,5 @@ CREATE POLICY "ai_insights: self and above"
   ON ai_insights FOR SELECT
   USING (
     target_id = auth.uid() OR
-    auth_role() IN ('manager', 'department_head', 'executive')
+    auth_role() IN ('manager', 'director', 'managing_director')
   );

@@ -16,15 +16,9 @@ ALTER TABLE tasks
   ADD COLUMN completed_quantity  NUMERIC(12,2) DEFAULT 0,
   ADD COLUMN unit                VARCHAR(100);
 
--- Auto-computed progress percentage (stored, always in sync)
+-- Progress percentage column (updated by trigger for outcome-based tracking)
 ALTER TABLE tasks
-  ADD COLUMN progress_percentage NUMERIC(5,2) GENERATED ALWAYS AS (
-    CASE
-      WHEN target_quantity IS NOT NULL AND target_quantity > 0
-      THEN ROUND((COALESCE(completed_quantity, 0) / target_quantity) * 100, 2)
-      ELSE NULL
-    END
-  ) STORED;
+  ADD COLUMN progress_percentage NUMERIC(5,2) DEFAULT 0;
 
 -- Validate completed never exceeds target
 ALTER TABLE tasks
@@ -75,7 +69,7 @@ CREATE POLICY "progress_history: manager read"
 -- Dept heads and executives see all
 CREATE POLICY "progress_history: exec read all"
   ON task_progress_history FOR SELECT
-  USING (auth_role() IN ('department_head', 'executive'));
+  USING (auth_role() IN ('director', 'managing_director'));
 
 -- Employees can insert progress for own tasks
 CREATE POLICY "progress_history: self insert"
