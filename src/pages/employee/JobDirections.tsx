@@ -869,6 +869,9 @@ export function JobDirections() {
                       <p className={cn('text-sm font-medium leading-snug flex-1', jd.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-800')}>{jd.work_details || '—'}</p>
                       <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap', STATUS_COLORS[jd.status])}>{STATUS_LABELS[jd.status] || jd.status}</span>
                     </div>
+                    {jd.description && (
+                      <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">{jd.description}</p>
+                    )}
                     <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
                       {jd.daily_target > 0 && <span>Daily: {jd.daily_completed}/{jd.daily_target}</span>}
                       {jd.weekly_target > 0 && <span>Weekly: {jd.weekly_completed}/{jd.weekly_target}</span>}
@@ -1072,6 +1075,9 @@ export function JobDirections() {
                         <p className={cn('text-sm font-medium leading-snug flex-1', jd.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-800')}>{jd.work_details || '—'}</p>
                         <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap', STATUS_COLORS[jd.status])}>{STATUS_LABELS[jd.status] || jd.status}</span>
                       </div>
+                      {jd.description && (
+                        <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">{jd.description}</p>
+                      )}
                       <div className="mt-1.5 flex items-center gap-2">
                         {employee && (
                           <>
