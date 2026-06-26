@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/Button'
-import { LayoutDashboard } from 'lucide-react'
 
 export function Login() {
   const { signIn, isAuthenticated } = useAuth()
@@ -30,13 +29,8 @@ export function Login() {
 
           {/* Logo */}
           <div className="mb-8 flex flex-col items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
-              <LayoutDashboard size={24} />
-            </span>
-            <div className="text-center">
-              <h1 className="text-lg font-bold text-slate-800 tracking-tight">Transworld</h1>
-              <p className="mt-1 text-xs text-slate-400 font-medium">Management Intelligence Platform</p>
-            </div>
+            <img src="/ti-logo.png" alt="Transworld International" className="h-14 w-auto" />
+            <p className="text-xs text-slate-400 font-medium">Management Intelligence Platform</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
