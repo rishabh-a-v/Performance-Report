@@ -241,7 +241,18 @@ export function TaskDetailModal({ item, onClose }: Props) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Due Date</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Due Date</label>
+                    {editDueDate && (
+                      <button
+                        type="button"
+                        onClick={() => setEditDueDate('')}
+                        className="text-[10px] font-semibold text-red-500 hover:text-red-700 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="date"
                     value={editDueDate}
