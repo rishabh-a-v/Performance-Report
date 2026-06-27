@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   Bell, CheckSquare, Clock, X,
   ChevronDown, LogOut, Menu, ShieldCheck,
-  UserPlus, Users,
+  UserPlus, Users, Network,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Avatar } from '@/components/ui/Avatar'
@@ -380,13 +380,22 @@ export function TopBar() {
                     </>
                   )}
                   {ADMIN_ROLES.includes(role ?? '') && (
-                    <button
-                      onClick={() => { setProfileOpen(false); navigate('/admin/role-permissions') }}
-                      className="flex w-full items-center gap-2.5 px-4 py-3 text-[15px] text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      <ShieldCheck size={16} className="shrink-0 text-indigo-500" />
-                      Role Permissions
-                    </button>
+                    <>
+                      <button
+                        onClick={() => { setProfileOpen(false); navigate('/admin/org-chart') }}
+                        className="flex w-full items-center gap-2.5 px-4 py-3 text-[15px] text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <Network size={16} className="shrink-0 text-indigo-500" />
+                        Org Chart
+                      </button>
+                      <button
+                        onClick={() => { setProfileOpen(false); navigate('/admin/role-permissions') }}
+                        className="flex w-full items-center gap-2.5 px-4 py-3 text-[15px] text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        <ShieldCheck size={16} className="shrink-0 text-indigo-500" />
+                        Role Permissions
+                      </button>
+                    </>
                   )}
                   <button
                     onClick={signOut}
@@ -436,9 +445,10 @@ export function TopBar() {
                   Manage Employees
                 </NavLink>
                 {ADMIN_ROLES.includes(role ?? '') && (
-                  <NavLink to="/admin/role-permissions" className={navLink}>
-                    Role Permissions
-                  </NavLink>
+                  <>
+                    <NavLink to="/admin/org-chart" className={navLink}>Org Chart</NavLink>
+                    <NavLink to="/admin/role-permissions" className={navLink}>Role Permissions</NavLink>
+                  </>
                 )}
               </>
             )}

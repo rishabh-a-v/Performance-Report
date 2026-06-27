@@ -10,6 +10,7 @@ import { SpecialTasks } from '@/pages/employee/SpecialTasks'
 import { AddEmployee } from '@/pages/employee/AddEmployee'
 import { ManageEmployees } from '@/pages/employee/ManageEmployees'
 import { RolePermissions } from '@/pages/admin/RolePermissions'
+import { OrgChart } from '@/pages/admin/OrgChart'
 
 import { ApprovalCenter } from '@/pages/manager/ApprovalCenter'
 import type { UserRole } from '@/types/database'
@@ -81,6 +82,7 @@ function AppRoutes() {
 
         {/* Admin */}
         <Route path="/admin/role-permissions" element={<Protected><RolePermissions /></Protected>} />
+        <Route path="/admin/org-chart"        element={<Protected><OrgChart /></Protected>} />
 
 
         {/* Legacy redirects */}
