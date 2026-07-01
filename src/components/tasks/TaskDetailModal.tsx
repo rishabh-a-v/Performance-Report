@@ -7,7 +7,28 @@ import { useSpecialTaskStore } from '@/store/specialTaskStore'
 import { useAuth } from '@/contexts/AuthContext'
 import { useProfileStore } from '@/store/profileStore'
 import { cn, formatDate } from '@/lib/utils'
-import type { JobDirection, SpecialTask } from '@/types/database'
+import type { JobDirection, SpecialTask, TaskPriority } from '@/types/database'
+
+const PRIORITY_ORDER: Record<TaskPriority, number> = { urgent: 3, high: 2, medium: 1, low: 0 }
+
+const PRIORITY_STYLES: Record<TaskPriority, string> = {
+  urgent: 'bg-red-100 text-red-700',
+  high:   'bg-amber-100 text-amber-700',
+  medium: 'bg-blue-100 text-blue-700',
+  low:    'bg-slate-100 text-slate-500',
+}
+
+const PRIORITY_LABELS: Record<TaskPriority, string> = {
+  urgent: 'Urgent', high: 'High', medium: 'Medium', low: 'Low',
+}
+
+function PriorityBadge({ priority }: { priority: TaskPriority }) {
+  return (
+    <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold', PRIORITY_STYLES[priority])}>
+      {PRIORITY_LABELS[priority]}
+    </span>
+  )
+}
 
 interface Props {
   item: { kind: 'jd'; data: JobDirection } | { kind: 'st'; data: SpecialTask } | null
@@ -27,6 +48,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
   const [isEditing, setIsEditing] = useState(false)
   const [editWorkDetails, setEditWorkDetails] = useState('')
   const [editDescription, setEditDescription] = useState('')
+  const [editExpectedOutput, setEditExpectedOutput] = useState('')
   const [editDailyTarget, setEditDailyTarget] = useState('')
   const [editWeeklyTarget, setEditWeeklyTarget] = useState('')
   const [editMonthlyTarget, setEditMonthlyTarget] = useState('')
@@ -34,6 +56,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
 
   const [editTaskName, setEditTaskName] = useState('')
   const [editDueDate, setEditDueDate] = useState('')
+  const [editPriority, setEditPriority] = useState<TaskPriority>('medium')
 
   useEffect(() => {
     if (item) {
@@ -41,6 +64,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
         const jdData = item.data as JobDirection
         setEditWorkDetails(jdData.work_details ?? '')
         setEditDescription(jdData.description ?? '')
+        setEditExpectedOutput(jdData.expected_output ?? '')
         setEditDailyTarget(String(jdData.daily_target))
         setEditWeeklyTarget(String(jdData.weekly_target))
         setEditMonthlyTarget(String(jdData.monthly_target))
@@ -50,6 +74,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
         setEditTaskName(stData.task_name)
         setEditDueDate(stData.due_date ?? '')
         setEditRemarks(stData.remarks ?? '')
+        setEditPriority(stData.priority ?? 'medium')
       }
     }
   }, [item, isEditing])
@@ -77,22 +102,33 @@ export function TaskDetailModal({ item, onClose }: Props) {
   const allAssignees = !isJD && st
     ? (st.assignees ?? []).map((a) => profiles.find((p) => p.id === a.employee_id)).filter(Boolean) as typeof profiles
     : []
-  const canEdit = !isJD || (
-    user?.role === 'managing_director' ||
-    user?.role === 'executive_assistant' ||
-    user?.role === 'hr' ||
-    (jd && jd.manager_id === user?.id)
-  )
+
+  const isAssigner = !!(st && user?.id === st.assigned_by)
+  const isAssignee = !!(st && st.assignees?.some((a) => a.employee_id === user?.id))
+  const isJDAdmin = ['managing_director', 'executive_assistant', 'hr'].includes(user?.role ?? '')
+  const isSTAdmin = ['managing_director', 'executive_assistant', 'hr', 'director'].includes(role ?? '')
+
+  const canEdit = isJD
+    ? (
+        isJDAdmin ||
+        (!!jd && jd.manager_id === user?.id) ||
+        (!!jd && jd.employee_id === user?.id)
+      )
+    : (isAssignee || isAssigner || isSTAdmin)
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault()
     if (!item) return
     if (isJD) {
-      const isEmployee = jd && user?.id === jd.employee_id
-      const statusUpdate = isEmployee ? { status: 'submitted' } : {}
+      const isEmployee = !!(jd && user?.id === jd.employee_id)
+      const isManagerOrAdmin = !!(jd && jd.manager_id === user?.id) || isJDAdmin
+      // Only force back to "submitted" when the editor genuinely needs someone else's approval —
+      // not when they're also the manager/admin who'd just be approving themselves.
+      const statusUpdate = (isEmployee && !isManagerOrAdmin) ? { status: 'submitted' } : {}
       useJobDirectionStore.getState().updateDirection(item.data.id, {
         work_details: editWorkDetails.trim() || null,
         description: editDescription.trim() || null,
+        expected_output: editExpectedOutput.trim() || null,
         daily_target: parseFloat(editDailyTarget) || 0,
         weekly_target: parseFloat(editWeeklyTarget) || 0,
         monthly_target: parseFloat(editMonthlyTarget) || 0,
@@ -100,8 +136,6 @@ export function TaskDetailModal({ item, onClose }: Props) {
         ...statusUpdate,
       })
     } else {
-      const isAssignee = st?.assignees?.some((a) => a.employee_id === user?.id)
-      const isAssigner = st?.assigned_by === user?.id
       const needsApproval = isAssignee && !isAssigner
       if (needsApproval) {
         useSpecialTaskStore.getState().updateTask(item.data.id, {
@@ -109,6 +143,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
             task_name: editTaskName.trim(),
             due_date: editDueDate || null,
             remarks: editRemarks.trim() || null,
+            priority: editPriority,
           },
           approval_status: 'pending',
         })
@@ -117,6 +152,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
           task_name: editTaskName.trim(),
           due_date: editDueDate || null,
           remarks: editRemarks.trim() || null,
+          priority: editPriority,
           pending_changes: null,
           approval_status: 'approved',
         })
@@ -125,9 +161,6 @@ export function TaskDetailModal({ item, onClose }: Props) {
     setIsEditing(false)
     onClose()
   }
-
-  const isAssigner = st && user?.id === st.assigned_by
-  const isAssignee = st && st.assignees?.some((a) => a.employee_id === user?.id)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -193,6 +226,17 @@ export function TaskDetailModal({ item, onClose }: Props) {
                     onChange={(e) => setEditDescription(e.target.value)}
                     rows={3}
                     placeholder="Add more context or details (optional)..."
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 resize-none focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Expected Output</label>
+                  <textarea
+                    value={editExpectedOutput}
+                    onChange={(e) => setEditExpectedOutput(e.target.value)}
+                    rows={3}
+                    placeholder="Describe what the result of this work should look like (optional)..."
                     className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 resize-none focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
@@ -283,6 +327,27 @@ export function TaskDetailModal({ item, onClose }: Props) {
                     className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 resize-none focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Priority</label>
+                  <div className="flex gap-1.5">
+                    {(['low', 'medium', 'high', 'urgent'] as TaskPriority[]).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setEditPriority(p)}
+                        className={cn(
+                          'flex-1 rounded-lg border px-2 py-1.5 text-[10px] font-semibold transition-colors',
+                          editPriority === p
+                            ? cn(PRIORITY_STYLES[p], 'border-transparent')
+                            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                        )}
+                      >
+                        {PRIORITY_LABELS[p]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </>
             )}
 
@@ -320,6 +385,25 @@ export function TaskDetailModal({ item, onClose }: Props) {
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Description</span>
                   <p className={cn('text-xs leading-relaxed bg-slate-50/55 rounded-lg p-3 border border-slate-100 whitespace-pre-wrap', jd?.description ? 'text-slate-600' : 'text-slate-300 italic')}>
                     {jd?.description || 'No description added.'}
+                  </p>
+                </div>
+              )}
+              {isJD && jd?.expected_output && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Expected Output</span>
+                    {jd.expected_output_achieved ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                        <CheckCircle2 size={10} /> Achieved
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                        <Circle size={10} /> Not yet achieved
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs leading-relaxed bg-slate-50/55 rounded-lg p-3 border border-slate-100 whitespace-pre-wrap text-slate-600">
+                    {jd.expected_output}
                   </p>
                 </div>
               )}
@@ -365,6 +449,14 @@ export function TaskDetailModal({ item, onClose }: Props) {
                     : st?.status}
                 </span>
               </div>
+
+              {/* Priority (ST only) */}
+              {!isJD && st && (
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Priority</span>
+                  <PriorityBadge priority={st.priority ?? 'medium'} />
+                </div>
+              )}
 
               {/* Approval Status (ST only) */}
               {!isJD && st && (
@@ -472,6 +564,29 @@ export function TaskDetailModal({ item, onClose }: Props) {
                     {isLoggingProgress ? 'Logging...' : 'Log Progress'}
                   </button>
                 </form>
+              </div>
+            )}
+
+            {/* Mark Expected Output as Achieved (JD only, for the assignee when active and an expected output exists) */}
+            {isJD && jd && jd.expected_output && user?.id === jd.employee_id && jd.status === 'active' && (
+              <div className="border-t border-slate-100 pt-3.5 space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Expected Output</span>
+                {jd.expected_output_achieved ? (
+                  <button
+                    onClick={() => useJobDirectionStore.getState().updateDirection(jd.id, { expected_output_achieved: false })}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    Mark as Not Achieved
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => useJobDirectionStore.getState().updateDirection(jd.id, { expected_output_achieved: true })}
+                    className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+                  >
+                    <CheckCircle2 size={12} className="inline mr-1.5 -mt-0.5" />
+                    Mark as Achieved
+                  </button>
+                )}
               </div>
             )}
 

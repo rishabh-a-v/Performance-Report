@@ -8,6 +8,7 @@ interface AddTaskPayload {
   assigned_by: string
   due_date: string | null
   status: SpecialTaskStatus
+  priority?: string
 }
 
 interface SpecialTaskStore {
@@ -15,7 +16,7 @@ interface SpecialTaskStore {
   isLoading: boolean
 
   fetchTasks: () => Promise<void>
-  addTask: (task: AddTaskPayload, assignee_ids: string[]) => Promise<void>
+  addTask: (task: AddTaskPayload, assignee_ids: string[]) => Promise<string | null>
   updateTask: (id: string, updates: Partial<SpecialTask>) => Promise<void>
   setStatus: (id: string, status: SpecialTaskStatus) => Promise<void>
   deleteTask: (id: string) => Promise<void>
@@ -65,7 +66,7 @@ export const useSpecialTaskStore = create<SpecialTaskStore>((set, get) => ({
 
     if (error) {
       console.error('Error adding special task:', error)
-      return
+      return error.message
     }
 
     const newTask = data as SpecialTask
@@ -80,7 +81,7 @@ export const useSpecialTaskStore = create<SpecialTaskStore>((set, get) => ({
         })))
       if (assigneeErr) {
         console.error('Error adding task assignees:', assigneeErr)
-        return
+        return assigneeErr.message
       }
     }
 
@@ -90,6 +91,7 @@ export const useSpecialTaskStore = create<SpecialTaskStore>((set, get) => ({
         assignees: assignee_ids.map((employee_id) => ({ employee_id, assigned_at: now })),
       } as SpecialTask, ...s.tasks],
     }))
+    return null
   },
 
   updateTask: async (id, updates) => {
@@ -109,10 +111,20 @@ export const useSpecialTaskStore = create<SpecialTaskStore>((set, get) => ({
   },
 
   setStatus: async (id, status) => {
-    const { error } = await supabase
+    const completed_at = status === 'Completed' ? new Date().toISOString() : null
+    // Try with completed_at; fall back to status-only if the column doesn't exist yet
+    let { error } = await supabase
       .from('special_tasks')
-      .update({ status })
+      .update({ status, completed_at })
       .eq('id', id)
+
+    if (error?.code === '42703' || error?.message?.includes('completed_at')) {
+      const fallback = await supabase
+        .from('special_tasks')
+        .update({ status })
+        .eq('id', id)
+      error = fallback.error
+    }
 
     if (error) {
       console.error('Error setting special task status:', error)
@@ -120,7 +132,7 @@ export const useSpecialTaskStore = create<SpecialTaskStore>((set, get) => ({
     }
 
     set((s) => ({
-      tasks: s.tasks.map((t) => t.id === id ? { ...t, status } : t),
+      tasks: s.tasks.map((t) => t.id === id ? { ...t, status, completed_at } : t),
     }))
   },
 

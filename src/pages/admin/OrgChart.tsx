@@ -17,9 +17,28 @@ import {
 import '@xyflow/react/dist/style.css'
 import { supabase } from '@/lib/supabase'
 import { useProfileStore } from '@/store/profileStore'
+import { useAuth } from '@/contexts/AuthContext'
 import type { Profile } from '@/types/database'
-import { X, Check, Building2, Briefcase, GitBranch } from 'lucide-react'
+import { X, Check, Building2, Briefcase, GitBranch, ShieldCheck } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
+
+const ADMIN_ROLES = ['managing_director', 'executive_assistant', 'hr']
+
+// Would setting employeeId's manager to newManagerId create a reporting cycle
+// (i.e. is newManagerId currently employeeId themselves, or one of their own
+// direct/indirect reports)?
+function wouldCreateCycle(profiles: Profile[], employeeId: string, newManagerId: string): boolean {
+  if (newManagerId === employeeId) return true
+  let current: string | null | undefined = newManagerId
+  const seen = new Set<string>()
+  while (current) {
+    if (current === employeeId) return true
+    if (seen.has(current)) return false
+    seen.add(current)
+    current = profiles.find((p) => p.id === current)?.manager_id
+  }
+  return false
+}
 
 // ── Role colours ─────────────────────────────────────────────────────────────
 const ROLE_COLOR: Record<string, { bg: string; border: string; badge: string; text: string }> = {
@@ -158,7 +177,10 @@ function EditPanel({
 }) {
   const [s, setS] = useState(state)
   const managers = profiles.filter(
-    (p) => p.id !== s.profile.id && ['managing_director', 'director', 'executive_assistant', 'manager'].includes(p.role)
+    (p) =>
+      p.id !== s.profile.id &&
+      ['managing_director', 'director', 'executive_assistant', 'manager'].includes(p.role) &&
+      !wouldCreateCycle(profiles, s.profile.id, p.id)
   )
 
   return (
@@ -237,6 +259,7 @@ interface DropConfirm { employee: Profile; newManager: Profile }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export function OrgChart() {
+  const { role } = useAuth()
   const { profiles, departments, branches, fetchAll } = useProfileStore()
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
@@ -291,15 +314,24 @@ export function OrgChart() {
       const isValidManager = ['managing_director', 'director', 'executive_assistant', 'manager'].includes(targetProfile.role)
       if (!isValidManager) return
       if (targetProfile.id === draggedProfile.manager_id) return
+      if (wouldCreateCycle(profiles, draggedProfile.id, targetProfile.id)) {
+        showToast(`Can't reassign — ${targetProfile.full_name} reports (directly or indirectly) to ${draggedProfile.full_name}`)
+        return
+      }
 
       setDropConfirm({ employee: draggedProfile, newManager: targetProfile })
     },
-    [nodes],
+    [nodes, profiles],
   )
 
   // Confirm drag reassignment
   async function confirmDrop() {
     if (!dropConfirm || saving) return
+    if (wouldCreateCycle(profiles, dropConfirm.employee.id, dropConfirm.newManager.id)) {
+      showToast('Cannot reassign — this would create a reporting cycle')
+      setDropConfirm(null)
+      return
+    }
     setSaving(true)
     const { error } = await supabase
       .from('profiles')
@@ -314,6 +346,10 @@ export function OrgChart() {
 
   // Save edit panel changes
   async function saveEdit(s: EditState) {
+    if (s.managerId && wouldCreateCycle(profiles, s.profile.id, s.managerId)) {
+      showToast('Cannot save — this would create a reporting cycle')
+      return
+    }
     setSaving(true)
     const { error } = await supabase.from('profiles').update({
       role: s.role,
@@ -329,6 +365,16 @@ export function OrgChart() {
   }
 
   const deptList = useMemo(() => departments.map((d) => ({ id: d.id, name: d.name })), [departments])
+
+  if (!ADMIN_ROLES.includes(role ?? '')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center gap-3">
+        <ShieldCheck size={36} className="text-slate-300" />
+        <p className="text-slate-500 font-medium">Access restricted</p>
+        <p className="text-sm text-slate-400">Only MD, EA, and HR can view the org chart.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="relative flex h-[calc(100vh-5rem)] flex-col">

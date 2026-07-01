@@ -31,10 +31,10 @@ export function useRBACFilter() {
     // MD / EA / HR — company-wide
     if (permissions.can_view_all_branches) return profiles
 
-    // Manager — recursive reporting chain, same branch
+    // Manager — recursive reporting chain (including themselves), same branch
     if (permissions.must_be_in_reporting_chain) {
       const chain = getReportingChain(user.id, profiles)
-      return profiles.filter((p) => chain.has(p.id) && p.branch === user.branch)
+      return profiles.filter((p) => (chain.has(p.id) || p.id === user.id) && p.branch === user.branch)
     }
 
     // Director — full branch visibility

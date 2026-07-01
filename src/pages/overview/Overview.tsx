@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useJobDirectionStore } from '@/store/jobDirectionStore'
 import { useSpecialTaskStore } from '@/store/specialTaskStore'
@@ -10,6 +11,7 @@ import {
   Users, Clock, ArrowRight, Plus, Bell,
 } from 'lucide-react'
 import type { JobDirection, SpecialTask } from '@/types/database'
+import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 
 const ROLE_DISPLAY: Record<string, string> = {
   executive: 'Executive',
@@ -90,7 +92,7 @@ function SectionHeading({ title, action, onAction }: { title: string; action?: s
   )
 }
 
-function JDRow({ jd, profiles }: { jd: JobDirection; profiles: ReturnType<typeof useProfileStore['getState']>['profiles'] }) {
+function JDRow({ jd, profiles, onClick }: { jd: JobDirection; profiles: ReturnType<typeof useProfileStore['getState']>['profiles']; onClick?: () => void }) {
   const emp = profiles.find((p) => p.id === jd.employee_id)
   const pillClass = JD_STATUS_PILL[jd.status] ?? 'bg-slate-100 text-slate-500'
 
@@ -102,7 +104,10 @@ function JDRow({ jd, profiles }: { jd: JobDirection; profiles: ReturnType<typeof
   })()
 
   return (
-    <div className="flex items-center gap-3 py-2.5 px-4">
+    <div
+      onClick={onClick}
+      className={cn('flex items-center gap-3 py-2.5 px-4 transition-colors', onClick && 'cursor-pointer hover:bg-slate-50')}
+    >
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-slate-700 truncate">
           {jd.work_details ?? '—'}
@@ -129,13 +134,16 @@ function JDRow({ jd, profiles }: { jd: JobDirection; profiles: ReturnType<typeof
   )
 }
 
-function TaskRow({ task, today, profiles }: { task: SpecialTask; today: string; profiles: ReturnType<typeof useProfileStore['getState']>['profiles'] }) {
+function TaskRow({ task, today, profiles, onClick }: { task: SpecialTask; today: string; profiles: ReturnType<typeof useProfileStore['getState']>['profiles']; onClick?: () => void }) {
   const isOverdue = task.due_date && task.due_date < today && task.status !== 'Completed'
   const assigner = profiles.find((p) => p.id === task.assigned_by)
   const pillClass = TASK_STATUS_PILL[task.status] ?? 'bg-slate-100 text-slate-500'
 
   return (
-    <div className="flex items-center gap-3 py-2.5 px-4">
+    <div
+      onClick={onClick}
+      className={cn('flex items-center gap-3 py-2.5 px-4 transition-colors', onClick && 'cursor-pointer hover:bg-slate-50')}
+    >
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-slate-700 truncate">{task.task_name}</p>
         <div className="flex items-center gap-2 mt-0.5">
@@ -163,6 +171,9 @@ function EmptyState({ message }: { message: string }) {
 export function Overview() {
   const { user, role } = useAuth()
   const navigate   = useNavigate()
+  const [selectedDetail, setSelectedDetail] = useState<
+    { kind: 'jd'; data: JobDirection } | { kind: 'st'; data: SpecialTask } | null
+  >(null)
   const directions = useJobDirectionStore((s) => s.directions)
   const tasks      = useSpecialTaskStore((s) => s.tasks)
   const profiles   = useProfileStore((s) => s.profiles)
@@ -191,13 +202,13 @@ export function Overview() {
   const myActiveTasks = myTasks.filter((t) => t.status !== 'Completed')
 
   // Overdue: same exclusions as SpecialTasks
-  const myOverdue = myTasks.filter((t) => t.due_date && t.due_date < today && t.status !== 'Completed').length
+  const myOverdue = myTasks.filter((t) => t.due_date && t.due_date < today && t.status !== 'Completed' && t.status !== 'In review').length
 
-  // Completed
-  const myCompleted = [
-    ...myJDs.filter((d) => d.status === 'completed'),
-    ...myTasks.filter((t) => t.status === 'Completed' && t.created_at?.startsWith(thisMonth)),
-  ].length
+  // Completed — JDs have no completion timestamp available client-side, so they can't be
+  // month-bounded; only the task count below is actually scoped to the current month.
+  const myCompletedJDs        = myJDs.filter((d) => d.status === 'completed').length
+  const myCompletedTasksMonth = myTasks.filter((t) => t.status === 'Completed' && t.completed_at?.startsWith(thisMonth)).length
+  const myCompleted = myCompletedJDs + myCompletedTasksMonth
 
   // Recent items (up to 4)
   const recentJDs   = myActiveJDs.slice(0, 4)
@@ -235,7 +246,7 @@ export function Overview() {
   const dateLabel = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-6xl mx-auto">
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4">
@@ -244,7 +255,7 @@ export function Overview() {
           <h1 className="text-2xl font-bold text-slate-900">
             {getGreeting()}, {user.full_name.split(' ')[0]} 👋
           </h1>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-0.5 text-sm text-slate-500">
             {ROLE_DISPLAY[role] ?? role}
             {user.branch ? <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{user.branch}</span> : null}
           </p>
@@ -299,8 +310,9 @@ export function Overview() {
             onClick={() => navigate('/special-tasks')}
           />
           <StatCard
-            label="Completed This Month"
+            label="Completed"
             value={myCompleted}
+            sub="Job Directions all-time, tasks this month"
             icon={TrendingUp}
             color="text-emerald-600"
             bg="bg-emerald-50"
@@ -326,7 +338,7 @@ export function Overview() {
           <div className="divide-y divide-slate-50">
             {recentJDs.length === 0
               ? <EmptyState message="No active job directions" />
-              : recentJDs.map((jd) => <JDRow key={jd.id} jd={jd} profiles={profiles} />)
+              : recentJDs.map((jd) => <JDRow key={jd.id} jd={jd} profiles={profiles} onClick={() => setSelectedDetail({ kind: 'jd', data: jd })} />)
             }
           </div>
         </div>
@@ -351,7 +363,7 @@ export function Overview() {
           <div className="divide-y divide-slate-50">
             {upcomingTasks.length === 0
               ? <EmptyState message="No active tasks" />
-              : upcomingTasks.map((t) => <TaskRow key={t.id} task={t} today={today} profiles={profiles} />)
+              : upcomingTasks.map((t) => <TaskRow key={t.id} task={t} today={today} profiles={profiles} onClick={() => setSelectedDetail({ kind: 'st', data: t })} />)
             }
           </div>
         </div>
@@ -409,7 +421,7 @@ export function Overview() {
                 </button>
               </div>
               <div className="divide-y divide-amber-100">
-                {pendingJDs.map((jd) => <JDRow key={jd.id} jd={jd} profiles={profiles} />)}
+                {pendingJDs.map((jd) => <JDRow key={jd.id} jd={jd} profiles={profiles} onClick={() => setSelectedDetail({ kind: 'jd', data: jd })} />)}
               </div>
             </div>
           )}
@@ -456,6 +468,8 @@ export function Overview() {
           </div>
         </div>
       )}
+
+      <TaskDetailModal item={selectedDetail} onClose={() => setSelectedDetail(null)} />
 
     </div>
   )

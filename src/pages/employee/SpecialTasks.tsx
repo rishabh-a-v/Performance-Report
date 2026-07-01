@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { useSpecialTaskStore } from '@/store/specialTaskStore'
 import { useAuth } from '@/contexts/AuthContext'
 import { useProfileStore } from '@/store/profileStore'
-import { formatDate } from '@/lib/utils'
+import { formatDate, todayLocalISO } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { CheckCircle2, Circle, Plus, Users, ClipboardList, Search, X, ChevronUp, ChevronDown, ChevronsUpDown, Trash2 } from 'lucide-react'
 import { useRBACFilter } from '@/hooks/useRBACFilter'
@@ -12,8 +12,8 @@ import { useUISchema } from '@/hooks/useUISchema'
 import { DynamicDataTable } from '@/components/ui/DynamicDataTable'
 
 type SortDir = 'asc' | 'desc'
-type MyTaskSortKey = 'task_name' | 'assigned_by' | 'created_at' | 'due_date' | 'status'
-type TeamTaskSortKey = 'task_name' | 'assigned_to' | 'assigned_by' | 'created_at' | 'due_date' | 'status'
+type MyTaskSortKey = 'task_name' | 'assigned_by' | 'created_at' | 'due_date' | 'status' | 'priority'
+type TeamTaskSortKey = 'task_name' | 'assigned_to' | 'assigned_by' | 'created_at' | 'due_date' | 'status' | 'priority'
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   if (!active) return <ChevronsUpDown size={12} className="text-slate-300 ml-1 inline shrink-0" />
@@ -31,9 +31,30 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/Select'
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
-import type { SpecialTask, SpecialTaskStatus } from '@/types/database'
+import type { SpecialTask, SpecialTaskStatus, TaskPriority } from '@/types/database'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
+
+const PRIORITY_ORDER: Record<TaskPriority, number> = { urgent: 3, high: 2, medium: 1, low: 0 }
+
+const PRIORITY_STYLES: Record<TaskPriority, string> = {
+  urgent: 'bg-red-100 text-red-700',
+  high:   'bg-amber-100 text-amber-700',
+  medium: 'bg-blue-100 text-blue-700',
+  low:    'bg-slate-100 text-slate-500',
+}
+
+const PRIORITY_LABELS: Record<TaskPriority, string> = {
+  urgent: 'Urgent', high: 'High', medium: 'Medium', low: 'Low',
+}
+
+function PriorityBadge({ priority }: { priority: TaskPriority }) {
+  return (
+    <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold', PRIORITY_STYLES[priority])}>
+      {PRIORITY_LABELS[priority]}
+    </span>
+  )
+}
 
 const STATUS_COLORS: Record<SpecialTaskStatus, string> = {
   'Yet to start': 'bg-slate-100 text-slate-600',
@@ -74,15 +95,17 @@ function KPICard({ label, value, color }: { label: string; value: number; color:
 
 function TaskRow({ task, onClick }: { task: SpecialTask; onClick?: () => void }) {
   const { setStatus, deleteTask } = useSpecialTaskStore()
-  const { user } = useAuth()
+  const { user, role } = useAuth()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const profiles = useProfileStore((s) => s.profiles)
   const assignedBy = profiles.find((p) => p.id === task.assigned_by)
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayLocalISO()
   const isDone = task.status === 'Completed'
   const isInReview = task.status === 'In review'
   const isOverdue = task.due_date && task.due_date < today && !isDone && !isInReview
   const isAssigner = user?.id === task.assigned_by
+  const isAdmin = ['managing_director', 'executive_assistant', 'hr', 'director'].includes(role ?? '')
+  const canDelete = isAssigner || isAdmin
 
   function handleToggle(e: React.MouseEvent) {
     e.stopPropagation()
@@ -136,6 +159,9 @@ function TaskRow({ task, onClick }: { task: SpecialTask; onClick?: () => void })
         </span>
       </td>
       <td className="py-4 px-5 whitespace-nowrap">
+        <PriorityBadge priority={task.priority ?? 'medium'} />
+      </td>
+      <td className="py-4 px-5 whitespace-nowrap">
         <div className="flex flex-col gap-1 items-start">
           <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold', STATUS_COLORS[task.status])}>
             {STATUS_LABELS[task.status]}
@@ -164,11 +190,14 @@ function TaskRow({ task, onClick }: { task: SpecialTask; onClick?: () => void })
             </button>
           )}
           {isInReview && !isAssigner && (
-            <button onClick={handleToggle} className="text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors">
+            <button
+              onClick={(e) => { e.stopPropagation(); setStatus(task.id, 'In progress') }}
+              className="text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors"
+            >
               Undo Submit
             </button>
           )}
-          {isAssigner && (
+          {canDelete && (
             confirmDelete ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-red-600 font-medium">Delete?</span>
@@ -210,7 +239,7 @@ function TeamTaskRow({ task, onClick }: { task: SpecialTask; onClick?: () => voi
   const profiles = useProfileStore((s) => s.profiles)
   const assignees = (task.assignees ?? []).map((a) => profiles.find((p) => p.id === a.employee_id)).filter(Boolean) as typeof profiles
   const assignedBy = profiles.find((p) => p.id === task.assigned_by)
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayLocalISO()
   const isOverdue = task.due_date && task.due_date < today && task.status !== 'Completed' && task.status !== 'In review'
 
   const isAssigner = task.assigned_by === user?.id
@@ -273,6 +302,9 @@ function TeamTaskRow({ task, onClick }: { task: SpecialTask; onClick?: () => voi
           {task.due_date ? formatDate(task.due_date) : '—'}
           {isOverdue && <span className="ml-1 text-xs">(Overdue)</span>}
         </span>
+      </td>
+      <td className="py-4 px-5 whitespace-nowrap">
+        <PriorityBadge priority={task.priority ?? 'medium'} />
       </td>
       <td className="py-4 px-5 whitespace-nowrap">
         <div className="flex flex-col gap-1 items-start">
@@ -355,9 +387,11 @@ export function AddTaskModal({ open, onClose, defaultAssigneeId }: AddTaskModalP
   const [taskName, setTaskName] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [remarks, setRemarks] = useState('')
+  const [priority, setPriority] = useState<TaskPriority>('medium')
   const [assigneeIds, setAssigneeIds] = useState<string[]>([])
   const [assigneeSearch, setAssigneeSearch] = useState('')
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const profiles = useProfileStore((s) => s.profiles)
   const assigneeOptions = (() => {
@@ -380,23 +414,32 @@ export function AddTaskModal({ open, onClose, defaultAssigneeId }: AddTaskModalP
     setError('')
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!taskName.trim()) { setError('Task name is required.'); return }
     if (assigneeIds.length === 0) { setError('Select at least one assignee.'); return }
 
+    setSubmitting(true)
     const isSelfOnly = assigneeIds.length === 1 && assigneeIds[0] === user?.id
-    addTask({
+    const errMsg = await addTask({
       task_name: taskName.trim(),
       remarks: remarks.trim() || null,
       assigned_by: user?.id ?? '',
       due_date: dueDate || null,
       status: isSelfOnly ? 'In progress' : 'Yet to start',
+      priority,
     }, assigneeIds)
+    setSubmitting(false)
+
+    if (errMsg) {
+      setError(`Failed to create task: ${errMsg}`)
+      return
+    }
 
     // Reset
     setTaskName('')
     setDueDate('')
     setRemarks('')
+    setPriority('medium')
     setAssigneeIds([])
     onClose()
   }
@@ -407,9 +450,11 @@ export function AddTaskModal({ open, onClose, defaultAssigneeId }: AddTaskModalP
       setTaskName('')
       setDueDate('')
       setRemarks('')
+      setPriority('medium')
       setAssigneeIds(defaultAssigneeId ? [defaultAssigneeId] : (user?.id ? [user.id] : []))
       setAssigneeSearch('')
       setError('')
+      setSubmitting(false)
     }
   }
 
@@ -496,11 +541,37 @@ export function AddTaskModal({ open, onClose, defaultAssigneeId }: AddTaskModalP
             value={remarks}
             onChange={(e) => setRemarks(e.target.value)}
           />
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-foreground/70">Priority</label>
+            <div className="flex gap-1.5">
+              {(['low', 'medium', 'high', 'urgent'] as TaskPriority[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPriority(p)}
+                  className={cn(
+                    'flex-1 rounded-lg border px-2 py-1.5 text-xs font-semibold transition-colors',
+                    priority === p
+                      ? cn(PRIORITY_STYLES[p], 'border-transparent')
+                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                  )}
+                >
+                  {PRIORITY_LABELS[p]}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
+        {error && error.startsWith('Failed') && (
+          <p className="text-xs text-red-600 font-medium px-1">{error}</p>
+        )}
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-          <Button size="sm" onClick={handleSubmit}>Create Task</Button>
+          <Button variant="outline" size="sm" onClick={onClose} disabled={submitting}>Cancel</Button>
+          <Button size="sm" onClick={handleSubmit} disabled={submitting}>
+            {submitting ? 'Creating…' : 'Create Task'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -529,8 +600,10 @@ export function SpecialTasks() {
   const [teamEmployee, setTeamEmployee]   = useState<string>('all')
   const [teamBranch,   setTeamBranch]     = useState('all')
   const [teamDept,     setTeamDept]       = useState('all')
-  const [mySortKey,    setMySortKey]      = useState<MyTaskSortKey>('due_date')
-  const [mySortDir,    setMySortDir]      = useState<SortDir>('asc')
+  const [mySortKey,    setMySortKey]      = useState<MyTaskSortKey>('priority')
+  const [mySortDir,    setMySortDir]      = useState<SortDir>('desc')
+  const [teamSortKey,  setTeamSortKey]    = useState<TeamTaskSortKey>('priority')
+  const [teamSortDir,  setTeamSortDir]    = useState<SortDir>('desc')
   const { visibleCols: taskSchema, loading: taskSchemaLoading } = useUISchema('special_tasks')
 
   const { allowedIds, availableBranches, availableDepartments, showBranchFilter, showDeptFilter } = useRBACFilter()
@@ -539,6 +612,11 @@ export function SpecialTasks() {
   function toggleMySort(key: MyTaskSortKey) {
     if (mySortKey === key) setMySortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else { setMySortKey(key); setMySortDir('asc') }
+  }
+
+  function toggleTeamSort(key: TeamTaskSortKey) {
+    if (teamSortKey === key) setTeamSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setTeamSortKey(key); setTeamSortDir('asc') }
   }
   if (!user) return null
 
@@ -554,9 +632,9 @@ export function SpecialTasks() {
   )
   const activeTeam = teamTasks.filter((t) => t.status !== 'Completed').length
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayLocalISO()
   const dueTodayCount   = myTasks.filter((t) => t.due_date === today && t.status !== 'Completed').length
-  const overdueCount    = myTasks.filter((t) => t.due_date && t.due_date < today && t.status !== 'Completed').length
+  const overdueCount    = myTasks.filter((t) => t.due_date && t.due_date < today && t.status !== 'Completed' && t.status !== 'In review').length
   const inProgressCount = myTasks.filter((t) => (t.status === 'Yet to start' || t.status === 'In progress' || t.status === 'In review')).length
   const completedCount  = myTasks.filter((t) => t.status === 'Completed').length
 
@@ -566,6 +644,8 @@ export function SpecialTasks() {
     teamTasks.forEach((t) => t.assignees?.forEach((a) => ids.add(a.employee_id)))
     return [...ids].map((id) => profiles.find((p) => p.id === id)).filter(Boolean) as typeof profiles
   }, [teamTasks, profiles])
+
+  const STATUS_ORDER: Record<string, number> = { 'Yet to start': 0, 'In progress': 1, 'In review': 2, Completed: 3 }
 
   // Filtered team tasks (RBAC + branch/dept/employee/search filters)
   const filteredTeam = useMemo(() => {
@@ -595,10 +675,30 @@ export function SpecialTasks() {
         profiles.find((p) => p.id === t.assigned_by)?.full_name.toLowerCase().includes(q)
       )
     }
-    return list
-  }, [teamTasks, teamBranch, teamDept, teamEmployee, teamSearch, profiles])
-
-  const STATUS_ORDER: Record<string, number> = { 'Yet to start': 0, 'In progress': 1, 'In review': 2, Completed: 3 }
+    return [...list].sort((a, b) => {
+      const sign = teamSortDir === 'asc' ? 1 : -1
+      if (teamSortKey === 'task_name') return sign * (a.task_name ?? '').localeCompare(b.task_name ?? '')
+      if (teamSortKey === 'assigned_to') {
+        const na = profiles.find((p) => p.id === a.assignees?.[0]?.employee_id)?.full_name ?? ''
+        const nb = profiles.find((p) => p.id === b.assignees?.[0]?.employee_id)?.full_name ?? ''
+        return sign * na.localeCompare(nb)
+      }
+      if (teamSortKey === 'assigned_by') {
+        const na = profiles.find((p) => p.id === a.assigned_by)?.full_name ?? ''
+        const nb = profiles.find((p) => p.id === b.assigned_by)?.full_name ?? ''
+        return sign * na.localeCompare(nb)
+      }
+      if (teamSortKey === 'created_at') return sign * (a.created_at ?? '').localeCompare(b.created_at ?? '')
+      if (teamSortKey === 'due_date') {
+        const da = a.due_date ?? '9999'
+        const db = b.due_date ?? '9999'
+        return sign * (da < db ? -1 : da > db ? 1 : 0)
+      }
+      if (teamSortKey === 'status') return sign * ((STATUS_ORDER[a.status] ?? 0) - (STATUS_ORDER[b.status] ?? 0))
+      if (teamSortKey === 'priority') return sign * ((PRIORITY_ORDER[a.priority ?? 'medium']) - (PRIORITY_ORDER[b.priority ?? 'medium']))
+      return 0
+    })
+  }, [teamTasks, teamBranch, teamDept, teamEmployee, teamSearch, profiles, teamSortKey, teamSortDir])
 
   const filteredMine = useMemo(() => {
     const base = activeTab === 'all'
@@ -612,25 +712,26 @@ export function SpecialTasks() {
         const nb = profiles.find((p) => p.id === b.assigned_by)?.full_name ?? ''
         return sign * na.localeCompare(nb)
       }
-      if (mySortKey === 'created_at') return sign * ((a.created_at ?? '') < (b.created_at ?? '') ? -1 : 1)
+      if (mySortKey === 'created_at') return sign * (a.created_at ?? '').localeCompare(b.created_at ?? '')
       if (mySortKey === 'due_date') {
         const da = a.due_date ?? '9999'
         const db = b.due_date ?? '9999'
         return sign * (da < db ? -1 : da > db ? 1 : 0)
       }
       if (mySortKey === 'status') return sign * ((STATUS_ORDER[a.status] ?? 0) - (STATUS_ORDER[b.status] ?? 0))
+      if (mySortKey === 'priority') return sign * ((PRIORITY_ORDER[a.priority ?? 'medium']) - (PRIORITY_ORDER[b.priority ?? 'medium']))
       return 0
     })
   }, [myTasks, activeTab, mySortKey, mySortDir, profiles])
 
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* ── Page header ── */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-slate-900">Tasks</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Track your work and what's happening across your team</p>
+          <h1 className="text-2xl font-bold text-slate-900">Tasks</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Track your work and what's happening across your team</p>
         </div>
         {canCreateTasks && (
           <Button size="sm" onClick={() => setShowAdd(true)}>
@@ -709,7 +810,7 @@ export function SpecialTasks() {
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors',
                     activeTab === tab.value
-                      ? 'border-blue-500 text-blue-600'
+                      ? 'border-blue-600 text-blue-700'
                       : 'border-transparent text-slate-500 hover:text-slate-700'
                   )}
                 >
@@ -802,7 +903,7 @@ export function SpecialTasks() {
               <div className="divide-y divide-slate-100 sm:hidden">
                 {filteredMine.map((task) => {
                   const assignedBy = profiles.find((p) => p.id === task.assigned_by)
-                  const today2 = new Date().toISOString().slice(0, 10)
+                  const today2 = todayLocalISO()
                   const isDone = task.status === 'Completed'
                   const isInReview = task.status === 'In review'
                   const isOverdue = task.due_date && task.due_date < today2 && !isDone && !isInReview
@@ -810,7 +911,10 @@ export function SpecialTasks() {
                     <div key={task.id} onClick={() => setSelectedDetail({ kind: 'st', data: task })} className="px-4 py-3 hover:bg-slate-50/70 cursor-pointer active:bg-slate-100">
                       <div className="flex items-start justify-between gap-2">
                         <p className={cn('text-sm font-medium leading-snug flex-1', isDone ? 'line-through text-slate-400' : 'text-slate-800')}>{task.task_name}</p>
-                        <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap', STATUS_COLORS[task.status])}>{STATUS_LABELS[task.status]}</span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <PriorityBadge priority={task.priority ?? 'medium'} />
+                          <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap', STATUS_COLORS[task.status])}>{STATUS_LABELS[task.status]}</span>
+                        </div>
                       </div>
                       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-400">
                         {assignedBy && <span>By {assignedBy.full_name}</span>}
@@ -834,6 +938,7 @@ export function SpecialTasks() {
                         { key: 'assigned_by' as MyTaskSortKey, label: 'Assigned By' },
                         { key: 'created_at' as MyTaskSortKey, label: 'Date Assigned' },
                         { key: 'due_date' as MyTaskSortKey, label: 'Due Date' },
+                        { key: 'priority' as MyTaskSortKey, label: 'Priority' },
                         { key: 'status' as MyTaskSortKey, label: 'Status' },
                       ]).map(({ key, label }) => (
                         <th key={key} className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -869,7 +974,7 @@ export function SpecialTasks() {
                 {filteredTeam.map((task) => {
                   const assignees = (task.assignees ?? []).map((a) => profiles.find((p) => p.id === a.employee_id)).filter(Boolean) as typeof profiles
                   const assignedBy = profiles.find((p) => p.id === task.assigned_by)
-                  const today2 = new Date().toISOString().slice(0, 10)
+                  const today2 = todayLocalISO()
                   const isOverdue = task.due_date && task.due_date < today2 && task.status !== 'Completed' && task.status !== 'In review'
                   return (
                     <div key={task.id} onClick={() => setSelectedDetail({ kind: 'st', data: task })} className="px-4 py-3 hover:bg-slate-50/70 cursor-pointer active:bg-slate-100">
@@ -877,9 +982,12 @@ export function SpecialTasks() {
                         <p className={cn('text-sm font-semibold leading-snug flex-1', task.status === 'Completed' ? 'line-through text-slate-400' : 'text-slate-800')}>
                           {task.task_name}
                         </p>
-                        <span className={cn('shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold whitespace-nowrap', STATUS_COLORS[task.status])}>
-                          {STATUS_LABELS[task.status]}
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <PriorityBadge priority={task.priority ?? 'medium'} />
+                          <span className={cn('rounded-full px-2.5 py-0.5 text-[10px] font-semibold whitespace-nowrap', STATUS_COLORS[task.status])}>
+                            {STATUS_LABELS[task.status]}
+                          </span>
+                        </div>
                       </div>
                       {task.remarks && (
                         <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">{task.remarks}</p>
@@ -913,12 +1021,21 @@ export function SpecialTasks() {
                 <table className="min-w-full">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50/50">
-                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Task</th>
-                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Assigned To</th>
-                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Assigned By</th>
-                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Date Assigned</th>
-                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Due Date</th>
-                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Status</th>
+                      {([
+                        { key: 'task_name' as TeamTaskSortKey, label: 'Task' },
+                        { key: 'assigned_to' as TeamTaskSortKey, label: 'Assigned To' },
+                        { key: 'assigned_by' as TeamTaskSortKey, label: 'Assigned By' },
+                        { key: 'created_at' as TeamTaskSortKey, label: 'Date Assigned' },
+                        { key: 'due_date' as TeamTaskSortKey, label: 'Due Date' },
+                        { key: 'priority' as TeamTaskSortKey, label: 'Priority' },
+                        { key: 'status' as TeamTaskSortKey, label: 'Status' },
+                      ]).map(({ key, label }) => (
+                        <th key={key} className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                          <button onClick={() => toggleTeamSort(key)} className="flex items-center hover:text-blue-600 transition-colors">
+                            {label}<SortIcon active={teamSortKey === key} dir={teamSortDir} />
+                          </button>
+                        </th>
+                      ))}
                       <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">Actions</th>
                     </tr>
                   </thead>

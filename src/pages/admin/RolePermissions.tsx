@@ -111,12 +111,27 @@ export function RolePermissions() {
     )
   }
 
+  // Turning either of these off for the last remaining role would leave submitted JDs/tasks
+  // with no one who can ever approve them — the workflow has no other recovery path.
+  const APPROVAL_KEYS: Array<keyof RolePermission> = ['can_approve_job_directions', 'can_approve_tasks']
+
   async function handleToggle(perm: RolePermission, key: keyof RolePermission) {
     if (saving || !user) return
+    const newValue = !perm[key]
+
+    if (APPROVAL_KEYS.includes(key) && !newValue) {
+      const anyOtherApprover = allPermissions.some((p) => p.role !== perm.role && p[key])
+      if (!anyOtherApprover) {
+        const label = COLUMNS.find((c) => c.key === key)?.label ?? String(key)
+        alert(`Can't turn off "${label}" for ${perm.label} — no other role has it enabled, which would leave nothing able to approve pending submissions. Enable it for another role first.`)
+        return
+      }
+    }
+
     setSaving(`${perm.role}-${String(key)}`)
     await updatePermission(
       perm.role,
-      { [key]: !perm[key] } as Partial<RolePermission>,
+      { [key]: newValue } as Partial<RolePermission>,
       user.id
     )
     setSaving(null)

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, addMonths, subMonths,
@@ -6,9 +6,10 @@ import {
 } from 'date-fns'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSpecialTaskStore } from '@/store/specialTaskStore'
+import { useTeamJobStore } from '@/store/teamJobStore'
 import { cn } from '@/lib/utils'
-import type { SpecialTask } from '@/types/database'
-import { ChevronLeft, ChevronRight, ListTodo } from 'lucide-react'
+import type { SpecialTask, TeamJobTask } from '@/types/database'
+import { ChevronLeft, ChevronRight, ListTodo, Briefcase } from 'lucide-react'
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -16,23 +17,43 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const ST_PILL: Record<string, string> = {
   'Yet to start': 'bg-slate-100 text-slate-600',
   'In progress':  'bg-blue-50 text-blue-700',
-  Completed:    'bg-emerald-50 text-emerald-700 line-through',
-  'In review':   'bg-purple-50 text-purple-700',
+  Completed:      'bg-emerald-50 text-emerald-700 line-through',
+  'In review':    'bg-purple-50 text-purple-700',
+}
+
+const TJ_PILL: Record<string, string> = {
+  'Yet to start': 'bg-amber-50 text-amber-700',
+  'In progress':  'bg-orange-50 text-orange-700',
+  Completed:      'bg-emerald-50 text-emerald-700 line-through',
 }
 
 type DayItem =
   | { kind: 'st'; data: SpecialTask }
+  | { kind: 'tj'; data: TeamJobTask; jobTitle: string }
 
 export function CalendarView() {
   const { user } = useAuth()
-  const allSTs = useSpecialTaskStore((s) => s.tasks)
-  const [month, setMonth] = useState(() => startOfMonth(new Date()))
-  const [selectedDay, setSelectedDay] = useState<Date | null>(null)
+  const allSTs      = useSpecialTaskStore((s) => s.tasks)
+  const allTeamJobs = useTeamJobStore((s) => s.jobs)
+  const [month, setMonth]               = useState(() => startOfMonth(new Date()))
+  const [selectedDay, setSelectedDay]   = useState<Date | null>(null)
   const [selectedDetail, setSelectedDetail] = useState<{ kind: 'st'; data: SpecialTask } | null>(null)
 
   if (!user) return null
 
   const mySTs = allSTs.filter((st) => st.assignees?.some((a) => a.employee_id === user.id) && st.due_date)
+
+  const myTeamTasks = useMemo(() => {
+    const result: Array<{ task: TeamJobTask; jobTitle: string }> = []
+    for (const job of allTeamJobs) {
+      for (const task of (job.tasks ?? [])) {
+        if (task.assignee_id === user.id && task.due_date) {
+          result.push({ task, jobTitle: job.title })
+        }
+      }
+    }
+    return result
+  }, [allTeamJobs, user.id])
 
   const days = eachDayOfInterval({
     start: startOfWeek(startOfMonth(month)),
@@ -43,13 +64,18 @@ export function CalendarView() {
     const stItems: DayItem[] = mySTs
       .filter((st) => st.due_date && isSameDay(parseISO(st.due_date), day))
       .map((st) => ({ kind: 'st' as const, data: st }))
-    return stItems
+
+    const tjItems: DayItem[] = myTeamTasks
+      .filter(({ task }) => task.due_date && isSameDay(parseISO(task.due_date), day))
+      .map(({ task, jobTitle }) => ({ kind: 'tj' as const, data: task, jobTitle }))
+
+    return [...stItems, ...tjItems]
   }
 
   const dayItems = selectedDay ? itemsForDay(selectedDay) : []
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
@@ -79,11 +105,15 @@ export function CalendarView() {
             <ListTodo size={11} className="text-slate-500" />
             <span>Special Task</span>
           </div>
+          <div className="flex items-center gap-1.5">
+            <Briefcase size={11} className="text-amber-500" />
+            <span>Team Sub-task</span>
+          </div>
         </div>
       </div>
 
       <div className="flex gap-5">
-        <div className="flex-1 min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="flex-1 min-w-0 rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
           <div className="grid grid-cols-7 border-b border-slate-100">
             {DAY_LABELS.map((d) => (
               <div key={d} className="py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -94,7 +124,7 @@ export function CalendarView() {
           <div className="grid grid-cols-7 divide-x divide-y divide-slate-100">
             {days.map((day) => {
               const items = itemsForDay(day)
-              const inMonth = isSameMonth(day, month)
+              const inMonth  = isSameMonth(day, month)
               const todayDay = isToday(day)
               const isSelected = selectedDay && isSameDay(day, selectedDay)
 
@@ -123,25 +153,35 @@ export function CalendarView() {
                     )}
                   </div>
                   <div className="space-y-0.5">
-                    {items.slice(0, 3).map((item) => (
-                      <div
-                        key={item.data.id}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedDetail(item)
-                        }}
-                        className={cn(
-                          'flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium truncate cursor-pointer hover:opacity-85',
-                          ST_PILL[item.data.status] ?? 'bg-slate-100 text-slate-600',
-                        )}
-                        title={item.data.task_name}
-                      >
-                        <ListTodo size={9} className="shrink-0 opacity-60" />
-                        <span className="truncate">
-                          {item.data.task_name}
-                        </span>
-                      </div>
-                    ))}
+                    {items.slice(0, 3).map((item) =>
+                      item.kind === 'st' ? (
+                        <div
+                          key={item.data.id}
+                          onClick={(e) => { e.stopPropagation(); setSelectedDetail(item) }}
+                          className={cn(
+                            'flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium truncate cursor-pointer hover:opacity-85',
+                            ST_PILL[item.data.status] ?? 'bg-slate-100 text-slate-600',
+                          )}
+                          title={item.data.task_name}
+                        >
+                          <ListTodo size={9} className="shrink-0 opacity-60" />
+                          <span className="truncate">{item.data.task_name}</span>
+                        </div>
+                      ) : (
+                        <div
+                          key={item.data.id}
+                          onClick={(e) => { e.stopPropagation(); setSelectedDay(day) }}
+                          className={cn(
+                            'flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium truncate cursor-pointer hover:opacity-85',
+                            TJ_PILL[item.data.status] ?? 'bg-amber-50 text-amber-700',
+                          )}
+                          title={`${item.jobTitle} — ${item.data.title}`}
+                        >
+                          <Briefcase size={9} className="shrink-0 opacity-60" />
+                          <span className="truncate">{item.data.title}</span>
+                        </div>
+                      )
+                    )}
                     {items.length > 3 && (
                       <div className="pl-1.5 text-[9px] font-semibold text-slate-400">+{items.length - 3} more</div>
                     )}
@@ -154,7 +194,7 @@ export function CalendarView() {
 
         {selectedDay && (
           <div className="w-64 shrink-0">
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
               <div className="border-b border-slate-100 px-4 py-3">
                 <p className="text-xs font-bold text-slate-800">{format(selectedDay, 'EEEE, MMMM d')}</p>
                 <p className="text-[10px] text-slate-400 mt-0.5">
@@ -165,13 +205,10 @@ export function CalendarView() {
                 {dayItems.length === 0 ? (
                   <div className="px-4 py-6 text-center text-[11px] text-slate-400">Nothing due on this day.</div>
                 ) : (
-                  dayItems.map((item) => {
-                    const st = item.data
-                    const statusLabel = st.status
-
-                    return (
-                      <div 
-                        key={item.data.id} 
+                  dayItems.map((item) =>
+                    item.kind === 'st' ? (
+                      <div
+                        key={item.data.id}
                         onClick={() => setSelectedDetail(item)}
                         className="px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer"
                       >
@@ -186,16 +223,43 @@ export function CalendarView() {
                             <div className="mt-1 flex items-center gap-1.5">
                               <span className={cn(
                                 'inline-block rounded-full px-1.5 py-px text-[9px] font-bold',
-                                ST_PILL[st.status],
+                                ST_PILL[item.data.status],
                               )}>
-                                {statusLabel}
+                                {item.data.status}
                               </span>
                             </div>
                           </div>
                         </div>
                       </div>
+                    ) : (
+                      <div key={item.data.id} className="px-4 py-3">
+                        <div className="flex items-start gap-2.5">
+                          <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-amber-50 text-amber-600">
+                            <Briefcase size={10} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-semibold text-slate-800 leading-snug">
+                              {item.data.title}
+                            </p>
+                            <p className="text-[9px] text-slate-400 mt-0.5 truncate">{item.jobTitle}</p>
+                            <div className="mt-1 flex items-center gap-1.5">
+                              <span className={cn(
+                                'inline-block rounded-full px-1.5 py-px text-[9px] font-bold',
+                                TJ_PILL[item.data.status],
+                              )}>
+                                {item.data.status}
+                              </span>
+                            </div>
+                            {item.data.notes && (
+                              <p className="mt-1 text-[9px] text-slate-400 italic leading-tight line-clamp-2">
+                                {item.data.notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     )
-                  })
+                  )
                 )}
               </div>
             </div>

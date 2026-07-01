@@ -14,9 +14,17 @@ export function Login() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const trimmedEmail = email.trim().toLowerCase()
+    const trimmedPhone = phone.trim()
+    // A whitespace-only value passes the native `required` check but trims to empty,
+    // which would otherwise silently fall back to a shared default password.
+    if (!trimmedEmail || !trimmedPhone) {
+      setError('Please enter both your work email and mobile number.')
+      return
+    }
     setLoading(true)
     setError(null)
-    const { error: err } = await signIn(email.trim().toLowerCase(), phone.trim())
+    const { error: err } = await signIn(trimmedEmail, trimmedPhone)
     if (err) setError(err)
     setLoading(false)
   }

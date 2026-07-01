@@ -82,6 +82,7 @@ export interface RolePermission {
   updated_by: string | null
 }
 export type SpecialTaskStatus = 'Yet to start' | 'In progress' | 'Completed' | 'In review'
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
 
 export interface Department {
   id: string
@@ -102,6 +103,9 @@ export interface Profile {
   employee_code: string | null
   phone_no: string | null
   branch: string | null
+  daily_working_hours?: number | null
+  efficiency_score?: number | null
+  max_overtime_hours?: number | null
   // joined
   department?: Department
   manager?: Profile
@@ -111,6 +115,8 @@ export interface JobDirection {
   id: string
   work_details: string | null
   description: string | null
+  expected_output: string | null
+  expected_output_achieved: boolean
   daily_target: number
   weekly_target: number
   monthly_target: number
@@ -122,6 +128,18 @@ export interface JobDirection {
   employee_id: string
   manager_id: string
   department_id: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface CapacityPlan {
+  id: string
+  branch: string
+  department_id: string
+  role: string
+  planned_headcount: number
+  plan_month: string
+  created_by: string | null
   created_at?: string
   updated_at?: string
 }
@@ -140,6 +158,7 @@ export interface SpecialTaskPendingChanges {
   task_name?: string
   due_date?: string | null
   remarks?: string | null
+  priority?: TaskPriority
 }
 
 export interface SpecialTask {
@@ -151,6 +170,8 @@ export interface SpecialTask {
   due_date: string | null
   status: SpecialTaskStatus
   remarks: string | null
+  priority: TaskPriority
+  completed_at?: string | null
   approval_status?: 'pending' | 'approved' | 'rejected'
   approval_by?: string | null
   approval_at?: string | null
@@ -169,5 +190,73 @@ export interface Reporting {
   // joined fields
   employee_name?: string
   reporting_to_name?: string
+}
+
+// ── Team Jobs ─────────────────────────────────────────────────────────────────
+
+export type TeamJobStatus  = 'active' | 'completed' | 'cancelled'
+export type TeamTaskStatus = 'Yet to start' | 'In progress' | 'Completed'
+
+export interface TeamJobTask {
+  id: string
+  job_id: string
+  title: string
+  task_type: string | null
+  assignee_id: string
+  status: TeamTaskStatus
+  notes: string | null
+  completed_at: string | null
+  due_date: string | null
+  created_at: string
+  updated_at: string
+  // joined
+  assignee?: Profile
+}
+
+export interface TeamJob {
+  id: string
+  title: string
+  description: string | null
+  created_by: string
+  head_id: string | null
+  status: TeamJobStatus
+  due_date: string | null
+  created_at: string
+  updated_at: string
+  // joined
+  tasks?: TeamJobTask[]
+  head?: Profile
+  creator?: Profile
+}
+
+// ── Employee Report RPC rows ──────────────────────────────────────────────────
+
+export interface JDReportRow {
+  id: string
+  work_details: string | null
+  monthly_target: number
+  achieved_in_period: number
+  status: string
+}
+
+export interface TaskReportRow {
+  id: string
+  task_name: string
+  due_date: string | null
+  status: string
+  created_at: string
+  completed_at?: string | null
+}
+
+export interface TeamTaskReportRow {
+  id: string
+  sub_task_title: string
+  job_title: string
+  task_type: string | null
+  due_date: string | null
+  status: string
+  completed_at: string | null
+  notes: string | null
+  created_at: string
 }
 

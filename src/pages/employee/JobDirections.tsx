@@ -291,6 +291,7 @@ function TeamDirectionRow({ jd, onClick }: { jd: JobDirection; onClick?: () => v
 const EMPTY_FORM = {
   work_details: '',
   description: '',
+  expected_output: '',
   daily_target: '',
   weekly_target: '',
   monthly_target: '',
@@ -378,16 +379,23 @@ export function AddDirectionModal({ open, onClose, defaultAssigneeId }: AddDirec
     const initialStatus = (isSeniorRole || isTopDown) ? 'active' : 'submitted'
 
     addDirection({
-      work_details:     form.work_details.trim(),
-      description:      form.description.trim() || null,
-      daily_target:     dailyTarget,
-      weekly_target:    weeklyTarget,
-      monthly_target:   monthlyTarget,
-      employee_id:      finalAssigneeId,
-      manager_id:       finalAssigneeId === user?.id ? (user?.manager_id || user?.id || '') : (user?.id ?? ''),
-      department_id:    assignee?.department_id ?? user?.department_id ?? null,
-      remarks:          null,
-      status:           initialStatus,
+      work_details:              form.work_details.trim(),
+      description:               form.description.trim() || null,
+      expected_output:           form.expected_output.trim() || null,
+      expected_output_achieved:  false,
+      daily_target:              dailyTarget,
+      weekly_target:             weeklyTarget,
+      monthly_target:            monthlyTarget,
+      employee_id:               finalAssigneeId,
+      // Route to whoever should actually review this: the assignee's own manager, except
+      // when top-down assigning to a direct report (isTopDown), where it auto-activates anyway
+      // and the creator legitimately stays the reviewer of record for their own report's JD.
+      manager_id:                finalAssigneeId === user?.id
+        ? (user?.manager_id || user?.id || '')
+        : (isTopDown ? (user?.id ?? '') : (assignee?.manager_id || user?.id || '')),
+      department_id:             assignee?.department_id ?? user?.department_id ?? null,
+      remarks:                   null,
+      status:                    initialStatus,
     })
 
     setForm(EMPTY_FORM)
@@ -477,6 +485,15 @@ export function AddDirectionModal({ open, onClose, defaultAssigneeId }: AddDirec
             rows={3}
             value={form.description}
             onChange={(e) => setField('description', e.target.value)}
+          />
+
+          <Textarea
+            id="jd-expected-output"
+            label="Expected Output"
+            placeholder="Describe what the result of this work should look like (optional)..."
+            rows={3}
+            value={form.expected_output}
+            onChange={(e) => setField('expected_output', e.target.value)}
           />
 
           <div className="space-y-3">
@@ -609,6 +626,8 @@ export function JobDirections() {
   const [selectedDetail, setSelectedDetail] = useState<{ kind: 'jd'; data: JobDirection } | null>(null)
   const [mySortKey,  setMySortKey]      = useState<JDMySortKey>('work_details')
   const [mySortDir,  setMySortDir]      = useState<SortDir>('asc')
+  const [teamSortKey, setTeamSortKey]   = useState<JDTeamSortKey>('work_details')
+  const [teamSortDir, setTeamSortDir]   = useState<SortDir>('asc')
   const { visibleCols: jdSchema, loading: jdSchemaLoading } = useUISchema('job_directions')
 
   const { allowedIds, availableBranches, availableDepartments, showBranchFilter, showDeptFilter } = useRBACFilter()
@@ -617,6 +636,11 @@ export function JobDirections() {
   function toggleMySort(key: JDMySortKey) {
     if (mySortKey === key) setMySortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else { setMySortKey(key); setMySortDir('asc') }
+  }
+
+  function toggleTeamSort(key: JDTeamSortKey) {
+    if (teamSortKey === key) setTeamSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setTeamSortKey(key); setTeamSortDir('asc') }
   }
   if (!user) return null
 
@@ -631,7 +655,7 @@ export function JobDirections() {
   const approvedCount  = myDirections.filter((d) => ['active', 'completed', 'approved'].includes(d.status)).length
   const completedCount = myDirections.filter((d) => d.status === 'completed').length
 
-  const JD_STATUS_ORDER: Record<string, number> = { active: 0, submitted: 1, approved: 2, rejected: 3, completed: 4 }
+  const JD_STATUS_ORDER: Record<string, number> = { active: 0, submitted: 1, approved: 2, rejected: 3, deletion_requested: 4, completed: 5 }
 
   const filteredMineBase = useMemo(() => {
     if (filterTab === 'all') return myDirections
@@ -675,18 +699,36 @@ export function JobDirections() {
           profiles.find((p) => p.id === d.employee_id)?.full_name.toLowerCase().includes(q)
       )
     }
-    return list
-  }, [teamDirections, teamBranch, teamDept, teamEmployee, teamSearch, profiles])
+    return [...list].sort((a, b) => {
+      const sign = teamSortDir === 'asc' ? 1 : -1
+      if (teamSortKey === 'work_details') return sign * (a.work_details ?? '').localeCompare(b.work_details ?? '')
+      if (teamSortKey === 'assigned_to') {
+        const na = profiles.find((p) => p.id === a.employee_id)?.full_name ?? ''
+        const nb = profiles.find((p) => p.id === b.employee_id)?.full_name ?? ''
+        return sign * na.localeCompare(nb)
+      }
+      if (teamSortKey === 'manager') {
+        const na = profiles.find((p) => p.id === a.manager_id)?.full_name ?? ''
+        const nb = profiles.find((p) => p.id === b.manager_id)?.full_name ?? ''
+        return sign * na.localeCompare(nb)
+      }
+      if (teamSortKey === 'status') return sign * ((JD_STATUS_ORDER[a.status] ?? 0) - (JD_STATUS_ORDER[b.status] ?? 0))
+      if (teamSortKey === 'daily') return sign * ((a.daily_completed ?? 0) - (b.daily_completed ?? 0))
+      if (teamSortKey === 'weekly') return sign * ((a.weekly_completed ?? 0) - (b.weekly_completed ?? 0))
+      if (teamSortKey === 'monthly') return sign * ((a.monthly_completed ?? 0) - (b.monthly_completed ?? 0))
+      return 0
+    })
+  }, [teamDirections, teamBranch, teamDept, teamEmployee, teamSearch, profiles, teamSortKey, teamSortDir])
 
   const activeTeam = teamDirections.filter((d) => d.status !== 'completed').length
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* ── Page header ── */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-slate-900">Job Directions</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Track your goals and what's assigned across your team</p>
+          <h1 className="text-2xl font-bold text-slate-900">Job Directions</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Track your goals and what's assigned across your team</p>
         </div>
         {canCreateJD && (
           <Button size="sm" onClick={() => setShowAdd(true)}>
@@ -773,7 +815,7 @@ export function JobDirections() {
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors',
                     filterTab === tab.value
-                      ? 'border-blue-500 text-blue-600'
+                      ? 'border-blue-600 text-blue-700'
                       : 'border-transparent text-slate-500 hover:text-slate-700'
                   )}
                 >
@@ -1101,13 +1143,21 @@ export function JobDirections() {
                 <table className="min-w-full">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50/50">
-                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Work Details</th>
-                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Assigned To</th>
-                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Manager</th>
-                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-40">Daily Progress</th>
-                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-40">Weekly Progress</th>
-                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-40">Monthly Progress</th>
-                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Status</th>
+                      {([
+                        { key: 'work_details' as JDTeamSortKey, label: 'Work Details', cls: '' },
+                        { key: 'assigned_to' as JDTeamSortKey, label: 'Assigned To', cls: '' },
+                        { key: 'manager' as JDTeamSortKey, label: 'Manager', cls: '' },
+                        { key: 'daily' as JDTeamSortKey, label: 'Daily Progress', cls: 'w-40' },
+                        { key: 'weekly' as JDTeamSortKey, label: 'Weekly Progress', cls: 'w-40' },
+                        { key: 'monthly' as JDTeamSortKey, label: 'Monthly Progress', cls: 'w-40' },
+                        { key: 'status' as JDTeamSortKey, label: 'Status', cls: '' },
+                      ]).map(({ key, label, cls }) => (
+                        <th key={key} className={`py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 ${cls}`}>
+                          <button onClick={() => toggleTeamSort(key)} className="flex items-center hover:text-blue-600 transition-colors">
+                            {label}<SortIcon active={teamSortKey === key} dir={teamSortDir} />
+                          </button>
+                        </th>
+                      ))}
                       <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">Actions</th>
                     </tr>
                   </thead>

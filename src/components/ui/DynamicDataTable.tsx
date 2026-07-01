@@ -171,6 +171,34 @@ function renderCell(
   }
 }
 
+// ─── Sort value extraction ──────────────────────────────────────────────────
+// Mirrors renderCell's logic so sorting matches what's actually displayed,
+// rather than sorting ref columns by raw foreign-key UUIDs or progress_bar
+// columns by the raw target instead of the shown percentage.
+
+function getSortValue(
+  col: ColumnDef,
+  row: Record<string, unknown>,
+  profiles: Profile[],
+  departments: Department[],
+): string | number {
+  const value = row[col.key]
+  switch (col.type as CellType) {
+    case 'profile_ref':
+      return profiles.find((p) => p.id === value)?.full_name ?? ''
+    case 'dept_ref':
+      return departments.find((d) => d.id === value)?.name ?? ''
+    case 'progress_bar': {
+      const target = (value as number) ?? 0
+      const compKey = col.meta?.completed_key ?? ''
+      const completed = (row[compKey] as number) ?? 0
+      return target > 0 ? Math.round((completed / target) * 100) : -1
+    }
+    default:
+      return (value as string | number) ?? ''
+  }
+}
+
 // ─── Sort icon ────────────────────────────────────────────────────────────────
 
 function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
@@ -217,12 +245,15 @@ export function DynamicDataTable({
 
   const sorted = useMemo(() => {
     if (!sortKey) return data
+    const col = schema.find((c) => c.key === sortKey)
+    if (!col) return data
     return [...data].sort((a, b) => {
-      const va = a[sortKey], vb = b[sortKey]
-      const cmp = String(va ?? '').localeCompare(String(vb ?? ''), undefined, { numeric: true })
+      const va = getSortValue(col, a, profiles, departments)
+      const vb = getSortValue(col, b, profiles, departments)
+      const cmp = String(va).localeCompare(String(vb), undefined, { numeric: true })
       return sortDir === 'asc' ? cmp : -cmp
     })
-  }, [data, sortKey, sortDir])
+  }, [data, sortKey, sortDir, schema, profiles, departments])
 
   if (loading) {
     return (
@@ -263,7 +294,7 @@ export function DynamicDataTable({
                   key={col.key}
                   className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400"
                 >
-                  {col.sortable ? (
+                  {col.sortable !== false && col.type !== 'profile_array' ? (
                     <button
                       onClick={() => toggleSort(col.key)}
                       className="flex items-center hover:text-blue-600 transition-colors"

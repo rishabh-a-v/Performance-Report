@@ -3,11 +3,11 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   Bell, CheckSquare, Clock, X,
   ChevronDown, LogOut, Menu, ShieldCheck,
-  UserPlus, Users, Network,
+  UserPlus, Users, Network, BarChart2, Briefcase,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Avatar } from '@/components/ui/Avatar'
-import { cn } from '@/lib/utils'
+import { cn, todayLocalISO } from '@/lib/utils'
 import { useSpecialTaskStore } from '@/store/specialTaskStore'
 import { useJobDirectionStore } from '@/store/jobDirectionStore'
 import { useProfileStore } from '@/store/profileStore'
@@ -27,6 +27,9 @@ const ROLE_ORDER: Record<string, number> = {
 }
 
 const ADMIN_ROLES: readonly string[] = ['managing_director', 'executive_assistant', 'hr']
+
+// Temporarily hidden from the nav — flip back to true to re-enable.
+const SHOW_CAPACITY_NAV = false
 
 export function TopBar() {
   const { user, role, signOut } = useAuth()
@@ -66,7 +69,11 @@ export function TopBar() {
 
   const roleLevel  = ROLE_ORDER[role] ?? 0
   const isManager  = roleLevel >= ROLE_ORDER.manager
-  const today      = new Date().toISOString().slice(0, 10)
+  const today      = todayLocalISO()
+  // Full ISO instant for synthesized "right now" notifications, so they sort correctly
+  // against real timestamps (like task_change's created_at) instead of a bare date string
+  // that `new Date(...)` would parse as UTC midnight.
+  const nowISO     = new Date().toISOString()
 
   // ── Badge counts & lists ───────────────────────────────────────────────────
   const isAdmin = ADMIN_ROLES.includes(role ?? '')
@@ -126,7 +133,7 @@ export function TopBar() {
       id: `jd_review_${d.id}`, type: 'jd',
       title: 'Job Direction needs review',
       body: `${emp?.full_name ?? 'An employee'} submitted "${d.work_details ?? 'Job Direction'}" for review`,
-      time: today, read: readIds.has(`jd_review_${d.id}`), path: '/approval-center',
+      time: nowISO, read: readIds.has(`jd_review_${d.id}`), path: '/approval-center',
     })
   })
 
@@ -137,7 +144,7 @@ export function TopBar() {
       id: `jd_del_${d.id}`, type: 'jd',
       title: 'Deletion request',
       body: `${emp?.full_name ?? 'An employee'} requested deletion of "${d.work_details ?? 'Job Direction'}"`,
-      time: today, read: readIds.has(`jd_del_${d.id}`), path: '/approval-center',
+      time: nowISO, read: readIds.has(`jd_del_${d.id}`), path: '/approval-center',
     })
   })
 
@@ -149,7 +156,7 @@ export function TopBar() {
       id: `st_change_${t.id}`, type: 'overdue',
       title: 'Task details change',
       body: `${emp?.full_name ?? 'An assignee'} updated details for "${t.task_name}"`,
-      time: t.created_at || today, read: readIds.has(`st_change_${t.id}`), path: '/approval-center',
+      time: t.created_at || nowISO, read: readIds.has(`st_change_${t.id}`), path: '/approval-center',
     })
   })
 
@@ -161,7 +168,7 @@ export function TopBar() {
       id: `st_review_${t.id}`, type: 'overdue',
       title: 'Task needs review',
       body: `${emp?.full_name ?? 'An assignee'} completed task "${t.task_name}"`,
-      time: t.created_at || today, read: readIds.has(`st_review_${t.id}`), path: '/approval-center',
+      time: t.created_at || nowISO, read: readIds.has(`st_review_${t.id}`), path: '/approval-center',
     })
   })
 
@@ -195,76 +202,73 @@ export function TopBar() {
   // ── Nav link class ──────────────────────────────────────────────────────────
   const navLink = ({ isActive }: { isActive: boolean }) =>
     cn(
-      'px-4 py-2.5 rounded-md text-[15px] font-medium transition-colors whitespace-nowrap',
+      'px-2.5 py-2 rounded-md text-[13px] font-medium transition-colors whitespace-nowrap',
       isActive ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50',
     )
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white shadow-sm">
-      <div className="flex h-16 items-center justify-between px-5 lg:px-8">
+      <div className="flex h-16 items-center px-5 lg:px-8">
 
-        {/* ── Left: Logo + Desktop Nav ───────────────────────────────────── */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => navigate('/overview')}
-            className="mr-6 shrink-0 transition-opacity hover:opacity-80"
-          >
-            <img src="/ti-logo.png" alt="TransWorld International" className="h-9 w-auto" />
-          </button>
+        {/* ── Logo ─────────────────────────────────────────────────────────── */}
+        <button
+          onClick={() => navigate('/overview')}
+          className="shrink-0 mr-3 transition-opacity hover:opacity-80"
+        >
+          <img src="/ti-logo.png" alt="TransWorld International" className="h-9 w-auto" />
+        </button>
 
-          <nav className="hidden items-center gap-0.5 lg:flex">
-            <NavLink to="/overview"       className={navLink}>Overview</NavLink>
-            <NavLink to="/job-directions" className={navLink}>Job Directions</NavLink>
-            <NavLink to="/special-tasks"  className={navLink}>Tasks</NavLink>
-            <NavLink to="/calendar"       className={navLink}>Calendar</NavLink>
+        {/* ── Desktop Nav — flex-1 keeps it from bleeding into right side ─── */}
+        <nav className="hidden flex-1 items-center gap-0 lg:flex min-w-0 overflow-hidden">
+          <NavLink to="/overview"       className={navLink}>Overview</NavLink>
+          <NavLink to="/job-directions" className={navLink}>Job Directions</NavLink>
+          <NavLink to="/special-tasks"  className={navLink}>Tasks</NavLink>
+          <NavLink to="/team-jobs"      className={navLink}>Team Jobs</NavLink>
+          <NavLink to="/calendar"       className={navLink}>Calendar</NavLink>
+          <NavLink to="/reports"        className={navLink}>Reports</NavLink>
 
-            {/* Approvals — managers+ */}
-            {isManager && (
+          {SHOW_CAPACITY_NAV && (['managing_director', 'executive_assistant', 'hr', 'director'] as readonly string[]).includes(role ?? '') && (
+            <NavLink to="/capacity" className={navLink}>Capacity</NavLink>
+          )}
+
+          {isManager && (
+            <NavLink
+              to="/approval-center"
+              className={({ isActive }) => cn(navLink({ isActive }), 'flex items-center gap-1.5')}
+            >
+              Approvals
+              {approvalBadge > 0 && (
+                <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 tabular-nums">
+                  {approvalBadge}
+                </span>
+              )}
+            </NavLink>
+          )}
+        </nav>
+
+        {/* ── Right: Admin actions + Notifications + Profile + Mobile ──────── */}
+        <div className="ml-auto flex items-center gap-1 shrink-0">
+
+          {/* Add Employee + Manage Employees — MD, EA, HR, Director */}
+          {(['managing_director', 'executive_assistant', 'hr', 'director'] as readonly string[]).includes(role ?? '') && (
+            <div className="hidden xl:flex items-center gap-1.5 mr-1">
+              <button
+                onClick={() => navigate('/add-employee')}
+                className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-indigo-700 whitespace-nowrap"
+              >
+                + Add Employee
+              </button>
               <NavLink
-                to="/approval-center"
+                to="/manage-employees"
                 className={({ isActive }) => cn(
-                  navLink({ isActive }),
-                  'flex items-center gap-1.5',
+                  'px-4 py-2 rounded-md text-[13px] font-medium transition-colors whitespace-nowrap border',
+                  isActive ? 'bg-slate-100 text-slate-900 border-slate-200' : 'text-slate-600 border-slate-200 hover:text-slate-900 hover:bg-slate-50',
                 )}
               >
-                Approvals
-                {approvalBadge > 0 && (
-                  <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 tabular-nums">
-                    {approvalBadge}
-                  </span>
-                )}
+                Manage Employees
               </NavLink>
-            )}
-
-          </nav>
-
-            {/* Add Employee + Manage Employees — MD, EA, HR, Director */}
-            {(['managing_director', 'executive_assistant', 'hr', 'director'] as readonly string[]).includes(role ?? '') && (
-              <div className="ml-2 hidden xl:flex items-center gap-1.5">
-                <button
-                  onClick={() => navigate('/add-employee')}
-                  className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-indigo-700 whitespace-nowrap"
-                >
-                  + Add Employee
-                </button>
-                <NavLink
-                  to="/manage-employees"
-                  className={({ isActive }) => cn(
-                    'px-4 py-2 rounded-md text-[13px] font-medium transition-colors whitespace-nowrap border',
-                    isActive
-                      ? 'bg-slate-100 text-slate-900 border-slate-200'
-                      : 'text-slate-600 border-slate-200 hover:text-slate-900 hover:bg-slate-50',
-                  )}
-                >
-                  Manage Employees
-                </NavLink>
-              </div>
-            )}
-
-        </div>
-
-        {/* ── Right: Notifications + Profile + Mobile toggle ──────────────── */}
-        <div className="flex items-center gap-1">
+            </div>
+          )}
 
           {/* Notifications */}
           <div className="relative" ref={notifRef}>
@@ -426,7 +430,12 @@ export function TopBar() {
             <NavLink to="/overview"       className={navLink}>Overview</NavLink>
             <NavLink to="/job-directions" className={navLink}>Job Directions</NavLink>
             <NavLink to="/special-tasks"  className={navLink}>Tasks</NavLink>
+            <NavLink to="/team-jobs"      className={navLink}>Team Jobs</NavLink>
             <NavLink to="/calendar"       className={navLink}>Calendar</NavLink>
+            <NavLink to="/reports"        className={navLink}>Reports</NavLink>
+            {SHOW_CAPACITY_NAV && (['managing_director', 'executive_assistant', 'hr', 'director'] as readonly string[]).includes(role ?? '') && (
+              <NavLink to="/capacity" className={navLink}>Capacity</NavLink>
+            )}
             {isManager && (
               <NavLink to="/approval-center" className={navLink}>
                 Approvals {approvalBadge > 0 && `(${approvalBadge})`}

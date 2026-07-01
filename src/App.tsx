@@ -13,6 +13,9 @@ import { RolePermissions } from '@/pages/admin/RolePermissions'
 import { OrgChart } from '@/pages/admin/OrgChart'
 
 import { ApprovalCenter } from '@/pages/manager/ApprovalCenter'
+import { TeamJobs } from '@/pages/teamjobs/TeamJobs'
+import { EmployeeReports } from '@/pages/reports/EmployeeReports'
+import { CapacityPlanning } from '@/pages/capacity/CapacityPlanning'
 import type { UserRole } from '@/types/database'
 
 import { useProfileStore } from '@/store/profileStore'
@@ -20,6 +23,8 @@ import { useJobDirectionStore } from '@/store/jobDirectionStore'
 import { useSpecialTaskStore } from '@/store/specialTaskStore'
 import { usePermissionStore } from '@/store/permissionStore'
 import { useReportingStore } from '@/store/reportingStore'
+import { useTeamJobStore } from '@/store/teamJobStore'
+import { useCapacityStore } from '@/store/capacityStore'
 
 const ROLE_LEVEL: Record<UserRole, number> = {
   executive: 0, executive_assistant: 3, hr: 3, manager: 1, director: 2, managing_director: 3,
@@ -45,6 +50,8 @@ function AppRoutes() {
       useJobDirectionStore.getState().fetchAll()
       useSpecialTaskStore.getState().fetchTasks()
       usePermissionStore.getState().fetchPermissions(role)
+      useTeamJobStore.getState().fetchJobs()
+      useCapacityStore.getState().fetchPlans()
 
       const unsubs = [
         useProfileStore.getState().subscribeToRealtime(),
@@ -52,6 +59,8 @@ function AppRoutes() {
         useJobDirectionStore.getState().subscribeToRealtime(),
         useSpecialTaskStore.getState().subscribeToRealtime(),
         usePermissionStore.getState().subscribeToRealtime(role),
+        useTeamJobStore.getState().subscribeToRealtime(),
+        useCapacityStore.getState().subscribeToRealtime(),
       ]
       return () => { unsubs.forEach((u) => u()) }
     }
@@ -75,14 +84,21 @@ function AppRoutes() {
         <Route path="/special-tasks"  element={<Protected><SpecialTasks /></Protected>} />
         <Route path="/calendar"       element={<Protected><CalendarView /></Protected>} />
 
+        {/* Team Jobs & Reports — all authenticated users */}
+        <Route path="/team-jobs" element={<Protected><TeamJobs /></Protected>} />
+        <Route path="/reports"   element={<Protected><EmployeeReports /></Protected>} />
+
+        {/* Capacity — director+ */}
+        <Route path="/capacity" element={<Protected minRole="director"><CapacityPlanning /></Protected>} />
+
         {/* Manager */}
         <Route path="/add-employee"      element={<Protected><AddEmployee /></Protected>} />
         <Route path="/manage-employees"  element={<Protected><ManageEmployees /></Protected>} />
         <Route path="/approval-center"   element={<Protected minRole="manager"><ApprovalCenter /></Protected>} />
 
-        {/* Admin */}
-        <Route path="/admin/role-permissions" element={<Protected><RolePermissions /></Protected>} />
-        <Route path="/admin/org-chart"        element={<Protected><OrgChart /></Protected>} />
+        {/* Admin — MD / EA / HR only (role level 3) */}
+        <Route path="/admin/role-permissions" element={<Protected minRole="managing_director"><RolePermissions /></Protected>} />
+        <Route path="/admin/org-chart"        element={<Protected minRole="managing_director"><OrgChart /></Protected>} />
 
 
         {/* Legacy redirects */}
