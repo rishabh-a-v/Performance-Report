@@ -36,6 +36,14 @@ const TASK_STATUS_ICON: Record<TeamTaskStatus, React.ElementType> = {
   Completed:      CheckCircle2,
 }
 
+// Click-to-cycle status, same pattern as Special Tasks: Yet to start -> In progress ->
+// Completed -> back to Yet to start (to undo a mistaken complete).
+function nextSubTaskStatus(current: TeamTaskStatus): TeamTaskStatus {
+  if (current === 'Completed') return 'Yet to start'
+  if (current === 'In progress') return 'Completed'
+  return 'In progress'
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function KPICard({ label, value, icon: Icon, color, bg }: {
@@ -374,14 +382,30 @@ function TeamJobDetailPanel({
                       )}
                     >
                       <div className="flex items-start gap-3">
-                        <StatusIcon
-                          size={16}
-                          className={cn(
-                            'mt-0.5 shrink-0',
-                            task.status === 'Completed'   ? 'text-emerald-500' :
-                            task.status === 'In progress' ? 'text-blue-500' : 'text-slate-400',
-                          )}
-                        />
+                        {canUpdate ? (
+                          <button
+                            onClick={() => updateSubTask(task.id, { status: nextSubTaskStatus(task.status) })}
+                            title="Click to update status"
+                            className={cn(
+                              'mt-0.5 shrink-0 transition-colors',
+                              task.status === 'Completed'
+                                ? 'text-emerald-500 hover:text-slate-300'
+                                : 'text-slate-400 hover:text-emerald-400',
+                              task.status === 'In progress' && 'text-blue-500 hover:text-emerald-500',
+                            )}
+                          >
+                            <StatusIcon size={16} />
+                          </button>
+                        ) : (
+                          <StatusIcon
+                            size={16}
+                            className={cn(
+                              'mt-0.5 shrink-0',
+                              task.status === 'Completed'   ? 'text-emerald-500' :
+                              task.status === 'In progress' ? 'text-blue-500' : 'text-slate-400',
+                            )}
+                          />
+                        )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             {task.task_type && (
@@ -687,15 +711,18 @@ function MySubTaskRow({
   job,
   onUpdate,
   onOpenJob,
+  onToggleStatus,
 }: {
   task: TeamJobTask
   job: TeamJob
   onUpdate: (t: TeamJobTask) => void
   onOpenJob: (j: TeamJob) => void
+  onToggleStatus: (t: TeamJobTask) => void
 }) {
   const today    = todayLocalISO()
   const isOverdue = task.due_date && task.due_date < today && task.status !== 'Completed'
   const StatusIcon = TASK_STATUS_ICON[task.status]
+  const canToggle = job.status === 'active'
 
   return (
     <div
@@ -710,14 +737,30 @@ function MySubTaskRow({
     >
       <div className="flex items-start gap-3">
         {/* Status icon */}
-        <StatusIcon
-          size={17}
-          className={cn(
-            'mt-0.5 shrink-0',
-            task.status === 'Completed'   ? 'text-emerald-500' :
-            task.status === 'In progress' ? 'text-blue-500'    : 'text-slate-400',
-          )}
-        />
+        {canToggle ? (
+          <button
+            onClick={() => onToggleStatus(task)}
+            title="Click to update status"
+            className={cn(
+              'mt-0.5 shrink-0 transition-colors',
+              task.status === 'Completed'
+                ? 'text-emerald-500 hover:text-slate-300'
+                : 'text-slate-400 hover:text-emerald-400',
+              task.status === 'In progress' && 'text-blue-500 hover:text-emerald-500',
+            )}
+          >
+            <StatusIcon size={17} />
+          </button>
+        ) : (
+          <StatusIcon
+            size={17}
+            className={cn(
+              'mt-0.5 shrink-0',
+              task.status === 'Completed'   ? 'text-emerald-500' :
+              task.status === 'In progress' ? 'text-blue-500'    : 'text-slate-400',
+            )}
+          />
+        )}
 
         <div className="flex-1 min-w-0">
           {/* Job context + type chips */}
@@ -1035,6 +1078,7 @@ export function TeamJobs() {
                 job={job}
                 onUpdate={(t) => setUpdatingMyTask(t)}
                 onOpenJob={(j) => setSelectedJob(j)}
+                onToggleStatus={(t) => useTeamJobStore.getState().updateSubTask(t.id, { status: nextSubTaskStatus(t.status) })}
               />
             ))}
           </div>
