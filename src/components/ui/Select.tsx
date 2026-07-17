@@ -143,6 +143,64 @@ const SelectSeparator = React.forwardRef<
 ))
 SelectSeparator.displayName = SelectPrimitive.Separator.displayName
 
+// A drop-in replacement for a native <select>, built on the Radix primitives
+// above so it renders our own themed popover everywhere — including mobile,
+// where a real <select> hands off to the OS picker (the plain dark list users
+// were seeing instead of the app's dropdown style). Accepts plain <option>
+// children and the familiar `value`/`onChange` (e.target.value) API so it can
+// swap in for `<select>` without rewriting call sites.
+const EMPTY_VALUE = '__empty__'
+
+interface OptionElementProps {
+  value?: string
+  disabled?: boolean
+  children?: React.ReactNode
+}
+
+const NativeSelect = React.forwardRef<
+  React.ElementRef<typeof SelectTrigger>,
+  {
+    value: string
+    onChange: (e: { target: { value: string; name: string; id?: string } }) => void
+    children: React.ReactNode
+    className?: string
+    disabled?: boolean
+    id?: string
+    name?: string
+  }
+>(({ value, onChange, children, className, disabled, id, name }, ref) => {
+  const options = React.Children.toArray(children)
+    .filter((child): child is React.ReactElement<OptionElementProps> => React.isValidElement(child))
+    .map((opt) => {
+      const rawValue = opt.props.value !== undefined ? String(opt.props.value) : String(opt.props.children ?? '')
+      return {
+        value: rawValue === '' ? EMPTY_VALUE : rawValue,
+        label: opt.props.children,
+        disabled: opt.props.disabled,
+      }
+    })
+
+  return (
+    <SelectPrimitive.Root
+      value={value === '' ? EMPTY_VALUE : value}
+      onValueChange={(v) => onChange({ target: { value: v === EMPTY_VALUE ? '' : v, name: name ?? '', id } })}
+      disabled={disabled}
+    >
+      <SelectTrigger ref={ref} id={id} className={className}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value} disabled={o.disabled}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </SelectPrimitive.Root>
+  )
+})
+NativeSelect.displayName = 'NativeSelect'
+
 export {
   Select,
   SelectGroup,
@@ -154,4 +212,5 @@ export {
   SelectSeparator,
   SelectScrollUpButton,
   SelectScrollDownButton,
+  NativeSelect,
 }

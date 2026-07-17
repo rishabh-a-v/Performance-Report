@@ -59,12 +59,12 @@ export function SkillGapPie({ data }: SkillGapPieProps) {
           </Pie>
           <Tooltip
             contentStyle={{
-              backgroundColor: '#ffffff',
-              border: '1px solid #e2e8f0',
+              backgroundColor: 'hsl(var(--card))',
+              border: '1px solid hsl(var(--border))',
               borderRadius: '12px',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
               fontSize: '11px',
-              fontFamily: 'Inter, sans-serif'
+              fontFamily: 'Inter, sans-serif',
+              color: 'hsl(var(--foreground))'
             }}
           />
           <Legend
@@ -75,7 +75,7 @@ export function SkillGapPie({ data }: SkillGapPieProps) {
             wrapperStyle={{
               fontSize: '10px',
               fontWeight: 600,
-              color: '#475569',
+              color: 'hsl(var(--muted-foreground))',
               marginTop: '10px'
             }}
           />

@@ -1,21 +1,23 @@
 import { useState, useEffect } from 'react'
 import {
-  X, Calendar, Compass, ListTodo, CheckCircle2, Circle
+  X, Calendar, Compass, ListTodo, CheckCircle2, Circle, Users
 } from 'lucide-react'
 import { useJobDirectionStore } from '@/store/jobDirectionStore'
 import { useSpecialTaskStore } from '@/store/specialTaskStore'
+import { useTeamJobStore } from '@/store/teamJobStore'
 import { useAuth } from '@/contexts/AuthContext'
 import { useProfileStore } from '@/store/profileStore'
+import { useRBACFilter } from '@/hooks/useRBACFilter'
 import { cn, formatDate } from '@/lib/utils'
-import type { JobDirection, SpecialTask, TaskPriority } from '@/types/database'
+import type { JobDirection, SpecialTask, TaskPriority, TeamJob, TeamJobTask } from '@/types/database'
 
 const PRIORITY_ORDER: Record<TaskPriority, number> = { urgent: 3, high: 2, medium: 1, low: 0 }
 
 const PRIORITY_STYLES: Record<TaskPriority, string> = {
-  urgent: 'bg-red-100 text-red-700',
-  high:   'bg-amber-100 text-amber-700',
-  medium: 'bg-blue-100 text-blue-700',
-  low:    'bg-slate-100 text-slate-500',
+  urgent: 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400',
+  high:   'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400',
+  medium: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400',
+  low:    'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
 }
 
 const PRIORITY_LABELS: Record<TaskPriority, string> = {
@@ -31,15 +33,23 @@ function PriorityBadge({ priority }: { priority: TaskPriority }) {
 }
 
 interface Props {
-  item: { kind: 'jd'; data: JobDirection } | { kind: 'st'; data: SpecialTask } | null
+  item:
+    | { kind: 'jd'; data: JobDirection }
+    | { kind: 'st'; data: SpecialTask }
+    | { kind: 'tjt'; data: TeamJobTask; job: TeamJob }
+    | null
   onClose: () => void
+  /** Optional: lets a "View Team Job" action open the full job panel (tjt only). */
+  onOpenJob?: (job: TeamJob) => void
 }
 
-export function TaskDetailModal({ item, onClose }: Props) {
+export function TaskDetailModal({ item, onClose, onOpenJob }: Props) {
   const { user, role } = useAuth()
   const profiles = useProfileStore((s) => s.profiles)
   const directions = useJobDirectionStore((s) => s.directions)
   const tasks = useSpecialTaskStore((s) => s.tasks)
+  const teamJobs = useTeamJobStore((s) => s.jobs)
+  const { allowedIds } = useRBACFilter()
 
   const [progressValue, setProgressValue] = useState('')
   const [isLoggingProgress, setIsLoggingProgress] = useState(false)
@@ -57,6 +67,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
   const [editTaskName, setEditTaskName] = useState('')
   const [editDueDate, setEditDueDate] = useState('')
   const [editPriority, setEditPriority] = useState<TaskPriority>('medium')
+  const [editTaskType, setEditTaskType] = useState('')
 
   useEffect(() => {
     if (item) {
@@ -69,6 +80,11 @@ export function TaskDetailModal({ item, onClose }: Props) {
         setEditWeeklyTarget(String(jdData.weekly_target))
         setEditMonthlyTarget(String(jdData.monthly_target))
         setEditRemarks(jdData.remarks ?? '')
+      } else if (item.kind === 'tjt') {
+        setEditTaskName(item.data.title)
+        setEditDueDate(item.data.due_date ?? '')
+        setEditRemarks(item.data.notes ?? '')
+        setEditTaskType(item.data.task_type ?? '')
       } else {
         const stData = item.data as SpecialTask
         setEditTaskName(stData.task_name)
@@ -81,9 +97,13 @@ export function TaskDetailModal({ item, onClose }: Props) {
 
   if (!item) return null
 
-  const isJD = item.kind === 'jd'
+  const isJD  = item.kind === 'jd'
+  const isTJT = item.kind === 'tjt'
   const jd = isJD ? (directions.find((d) => d.id === item.data.id) || (item.data as JobDirection)) : null
-  const st = !isJD ? (tasks.find((t) => t.id === item.data.id) || (item.data as SpecialTask)) : null
+  const st = item.kind === 'st' ? (tasks.find((t) => t.id === item.data.id) || (item.data as SpecialTask)) : null
+  // Live copies so realtime/store updates reflect while the modal is open
+  const tjJob = isTJT ? (teamJobs.find((j) => j.id === item.job.id) ?? item.job) : null
+  const tjt   = isTJT ? ((tjJob?.tasks ?? []).find((t) => t.id === item.data.id) ?? item.data) : null
 
   async function handleLogProgress(e: React.FormEvent) {
     e.preventDefault()
@@ -98,8 +118,8 @@ export function TaskDetailModal({ item, onClose }: Props) {
   }
 
   const employee = profiles.find((p) => p.id === (jd ? jd.employee_id : ''))
-  const manager = profiles.find((p) => p.id === (jd ? jd.manager_id : st ? st.assigned_by : ''))
-  const allAssignees = !isJD && st
+  const manager = profiles.find((p) => p.id === (jd ? jd.manager_id : st ? st.assigned_by : tjJob ? tjJob.created_by : ''))
+  const allAssignees = st
     ? (st.assignees ?? []).map((a) => profiles.find((p) => p.id === a.employee_id)).filter(Boolean) as typeof profiles
     : []
 
@@ -108,13 +128,33 @@ export function TaskDetailModal({ item, onClose }: Props) {
   const isJDAdmin = ['managing_director', 'executive_assistant', 'hr'].includes(user?.role ?? '')
   const isSTAdmin = ['managing_director', 'executive_assistant', 'hr', 'director'].includes(role ?? '')
 
+  // Team-job sub-task permissions — same rules as the job panel: assignees can
+  // update; creator/head or an in-scope manager can manage; nothing once the
+  // parent job is no longer active.
+  const tjAssigneeProfile = profiles.find((p) => p.id === tjt?.assignee_id)
+  const tjIsAssignee = !!(tjt && tjt.assignee_id === user?.id)
+  const tjIsManagerOrAbove = ['manager', 'director', 'managing_director', 'executive_assistant', 'hr'].includes(role ?? '')
+  const tjJobInScope = !!tjJob && (
+    allowedIds.has(tjJob.created_by ?? '') ||
+    allowedIds.has(tjJob.head_id ?? '') ||
+    (tjJob.tasks ?? []).some((t) => t.assignee_id && allowedIds.has(t.assignee_id))
+  )
+  const tjCanManage = !!tjJob && (
+    tjJob.created_by === user?.id ||
+    tjJob.head_id === user?.id ||
+    (tjIsManagerOrAbove && tjJobInScope)
+  )
+  const tjCanUpdate = !!tjJob && (tjIsAssignee || tjCanManage) && tjJob.status === 'active'
+
   const canEdit = isJD
     ? (
         isJDAdmin ||
         (!!jd && jd.manager_id === user?.id) ||
         (!!jd && jd.employee_id === user?.id)
       )
-    : (isAssignee || isAssigner || isSTAdmin)
+    : isTJT
+      ? tjCanUpdate
+      : (isAssignee || isAssigner || isSTAdmin)
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -134,6 +174,13 @@ export function TaskDetailModal({ item, onClose }: Props) {
         monthly_target: parseFloat(editMonthlyTarget) || 0,
         remarks: editRemarks.trim() || null,
         ...statusUpdate,
+      })
+    } else if (item.kind === 'tjt') {
+      useTeamJobStore.getState().updateSubTask(item.data.id, {
+        title: editTaskName.trim(),
+        task_type: editTaskType.trim() || null,
+        due_date: editDueDate || null,
+        notes: editRemarks.trim() || null,
       })
     } else {
       const needsApproval = isAssignee && !isAssigner
@@ -163,20 +210,28 @@ export function TaskDetailModal({ item, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center sm:p-4">
       {/* Backdrop overlay */}
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="hidden sm:block absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
 
       {/* Main Container */}
-      <div className="relative flex w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl overflow-hidden border border-slate-200 animate-slide-in">
+      <div className="relative flex w-full h-full sm:h-auto sm:max-w-lg flex-col sm:rounded-2xl bg-card shadow-2xl overflow-hidden border-none sm:border border-slate-200 animate-slide-in">
         
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-3.5">
+        <div
+          className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-3.5"
+          style={{ paddingTop: 'calc(0.875rem + env(safe-area-inset-top))' }}
+        >
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">
             {isJD ? (
               <>
                 <Compass size={14} className="text-blue-500" />
                 <span>Job Direction Details</span>
+              </>
+            ) : isTJT ? (
+              <>
+                <Users size={14} className="text-amber-500" />
+                <span>Team Job Sub-task Details</span>
               </>
             ) : (
               <>
@@ -189,7 +244,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
             {!isEditing && canEdit && (
               <button
                 onClick={() => setIsEditing(true)}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                className="rounded-lg border border-slate-200 bg-card px-2.5 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
               >
                 Edit
               </button>
@@ -205,7 +260,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
 
         {/* Edit Form or Static View */}
         {isEditing ? (
-          <form onSubmit={handleSave} className="p-6 overflow-y-auto max-h-[70vh] space-y-4 text-slate-700">
+          <form onSubmit={handleSave} className="p-6 overflow-y-auto flex-1 max-h-none sm:max-h-[70vh] space-y-4 text-slate-700">
             {isJD ? (
               <>
                 <div className="space-y-1">
@@ -284,6 +339,62 @@ export function TaskDetailModal({ item, onClose }: Props) {
                   />
                 </div>
               </>
+            ) : isTJT ? (
+              <>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Sub-task Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editTaskName}
+                    onChange={(e) => setEditTaskName(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Type</label>
+                  <input
+                    type="text"
+                    value={editTaskType}
+                    onChange={(e) => setEditTaskType(e.target.value)}
+                    placeholder="e.g. Site Survey (optional)"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Due Date</label>
+                    {editDueDate && (
+                      <button
+                        type="button"
+                        onClick={() => setEditDueDate('')}
+                        className="text-[10px] font-semibold text-red-500 hover:text-red-700 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="date"
+                    value={editDueDate}
+                    onChange={(e) => setEditDueDate(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Notes / Updates</label>
+                  <textarea
+                    value={editRemarks}
+                    onChange={(e) => setEditRemarks(e.target.value)}
+                    rows={3}
+                    placeholder="Describe progress, blockers, or findings..."
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 resize-none focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </>
             ) : (
               <>
                 <div className="space-y-1">
@@ -340,7 +451,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
                           'flex-1 rounded-lg border px-2 py-1.5 text-[10px] font-semibold transition-colors',
                           editPriority === p
                             ? cn(PRIORITY_STYLES[p], 'border-transparent')
-                            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                            : 'border-slate-200 bg-card text-slate-500 hover:bg-slate-50'
                         )}
                       >
                         {PRIORITY_LABELS[p]}
@@ -355,7 +466,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
               <button
                 type="button"
                 onClick={() => setIsEditing(false)}
-                className="rounded-lg border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                className="rounded-lg border border-slate-200 bg-card px-3.5 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50"
               >
                 Cancel
               </button>
@@ -369,11 +480,11 @@ export function TaskDetailModal({ item, onClose }: Props) {
           </form>
         ) : (
           /* Static View Content */
-          <div className="p-6 overflow-y-auto max-h-[70vh] space-y-5 text-slate-700">
+          <div className="p-6 overflow-y-auto flex-1 max-h-none sm:max-h-[70vh] space-y-5 text-slate-700">
             {/* Title / Name */}
             <div>
               <h3 className="text-base font-bold text-slate-800 leading-snug">
-                {isJD ? 'Job Direction' : st?.task_name}
+                {isJD ? 'Job Direction' : isTJT ? tjt?.title : st?.task_name}
               </h3>
               {isJD && jd?.work_details && (
                 <p className="mt-1.5 text-xs text-slate-500 leading-relaxed bg-slate-50/55 rounded-lg p-3 border border-slate-100">
@@ -412,6 +523,14 @@ export function TaskDetailModal({ item, onClose }: Props) {
                   {st.remarks}
                 </p>
               )}
+              {isTJT && tjt?.notes && (
+                <div className="mt-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Notes / Updates</span>
+                  <p className="text-xs text-slate-500 leading-relaxed bg-slate-50/55 rounded-lg p-3 border border-slate-100 whitespace-pre-wrap">
+                    {tjt.notes}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Key-Value Details Grid */}
@@ -435,7 +554,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
                         'In progress':  'bg-blue-100 text-blue-700',
                         'Completed':    'bg-emerald-100 text-emerald-700',
                         'In review':    'bg-purple-100 text-purple-700',
-                      }[st?.status as string]
+                      }[(isTJT ? tjt?.status : st?.status) as string]
                 )}>
                   {isJD
                     ? ({
@@ -446,7 +565,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
                         completed:           'Completed',
                         deletion_requested:  'Deletion Pending',
                       }[jd?.status || ''] ?? jd?.status)
-                    : st?.status}
+                    : isTJT ? tjt?.status : st?.status}
                 </span>
               </div>
 
@@ -475,11 +594,33 @@ export function TaskDetailModal({ item, onClose }: Props) {
                 </div>
               )}
 
+              {/* Type + parent job (TJ sub-task only) */}
+              {isTJT && (
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Type</span>
+                  {tjt?.task_type ? (
+                    <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                      {tjt.task_type}
+                    </span>
+                  ) : (
+                    <span className="font-medium text-slate-400">—</span>
+                  )}
+                </div>
+              )}
+              {isTJT && tjJob && (
+                <div className="space-y-1 col-span-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Part of Team Job</span>
+                  <span className="font-medium text-slate-800">↳ {tjJob.title}</span>
+                </div>
+              )}
+
               {/* Employee / Assignees */}
               <div className="space-y-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Assigned To</span>
                 {isJD ? (
                   <span className="font-medium text-slate-800">{employee?.full_name ?? '—'}</span>
+                ) : isTJT ? (
+                  <span className="font-medium text-slate-800">{tjAssigneeProfile?.full_name ?? '—'}</span>
                 ) : allAssignees.length === 0 ? (
                   <span className="font-medium text-slate-400">—</span>
                 ) : (
@@ -496,7 +637,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
               {/* Manager / Reviewer */}
               <div className="space-y-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  {isJD ? 'Manager / Reviewer' : 'Assigned By'}
+                  {isJD ? 'Manager / Reviewer' : isTJT ? 'Created By' : 'Assigned By'}
                 </span>
                 <span className="font-medium text-slate-800">{manager?.full_name ?? '—'}</span>
               </div>
@@ -519,17 +660,27 @@ export function TaskDetailModal({ item, onClose }: Props) {
                 </>
               )}
 
-              {/* Due Date & Date Created (ST only) */}
+              {/* Due Date & Date Created (ST + TJ sub-task) */}
               {!isJD && (
                 <>
                   <div className="space-y-1">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Date Created</span>
-                    <span className="font-medium text-slate-800">{st ? formatDate(st.created_at) : '—'}</span>
+                    <span className="font-medium text-slate-800">
+                      {st ? formatDate(st.created_at) : tjt ? formatDate(tjt.created_at) : '—'}
+                    </span>
                   </div>
                   <div className="space-y-1">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Due Date</span>
-                    <span className="font-medium text-slate-800">{st?.due_date ? formatDate(st.due_date) : '—'}</span>
+                    <span className="font-medium text-slate-800">
+                      {(st?.due_date || tjt?.due_date) ? formatDate((st?.due_date ?? tjt?.due_date)!) : '—'}
+                    </span>
                   </div>
+                  {isTJT && tjt?.completed_at && (
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Completed On</span>
+                      <span className="font-medium text-emerald-700">{formatDate(tjt.completed_at)}</span>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -574,7 +725,7 @@ export function TaskDetailModal({ item, onClose }: Props) {
                 {jd.expected_output_achieved ? (
                   <button
                     onClick={() => useJobDirectionStore.getState().updateDirection(jd.id, { expected_output_achieved: false })}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                    className="w-full rounded-lg border border-slate-200 bg-card px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
                   >
                     Mark as Not Achieved
                   </button>
@@ -617,6 +768,69 @@ export function TaskDetailModal({ item, onClose }: Props) {
               })()
             )}
 
+            {/* Actions (TJ sub-task) — mirrors the Special Task layout */}
+            {isTJT && tjt && tjJob && (
+              <div className="border-t border-slate-100 pt-3.5 space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Actions</span>
+                {tjJob.status !== 'active' && (
+                  <p className="text-xs text-slate-500 font-medium bg-slate-50 rounded-lg p-2.5 border border-slate-100 text-center">
+                    This team job is {tjJob.status} — sub-tasks can no longer be updated.
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {tjCanUpdate && tjt.status === 'Yet to start' && (
+                    <button
+                      onClick={() => { useTeamJobStore.getState().updateSubTask(tjt.id, { status: 'In progress' }); onClose() }}
+                      className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition-colors"
+                    >
+                      Mark In Progress
+                    </button>
+                  )}
+                  {tjCanUpdate && tjt.status === 'In progress' && (
+                    <button
+                      onClick={() => { useTeamJobStore.getState().updateSubTask(tjt.id, { status: 'Completed' }); onClose() }}
+                      className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+                    >
+                      Mark Complete
+                    </button>
+                  )}
+                  {tjCanUpdate && tjt.status === 'Completed' && (
+                    <button
+                      onClick={() => { useTeamJobStore.getState().updateSubTask(tjt.id, { status: 'In progress' }); onClose() }}
+                      className="flex-1 rounded-lg border border-slate-200 bg-card px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      Undo (back to In Progress)
+                    </button>
+                  )}
+                  {onOpenJob && (
+                    <button
+                      onClick={() => { onClose(); onOpenJob(tjJob) }}
+                      className="flex-1 rounded-lg border border-slate-200 bg-card px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      View Team Job
+                    </button>
+                  )}
+                </div>
+
+                {/* Delete sub-task — job creator/head or in-scope manager only */}
+                {tjCanManage && tjJob.status === 'active' && (
+                  <div className="border-t border-slate-100 pt-2">
+                    <button
+                      onClick={() => {
+                        if (confirm('Are you sure you want to delete this sub-task?')) {
+                          useTeamJobStore.getState().deleteSubTask(tjt.id, tjJob.id)
+                          onClose()
+                        }
+                      }}
+                      className="w-full rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 transition-colors shadow-sm"
+                    >
+                      Delete Sub-task
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {!isJD && st && (
               <div className="border-t border-slate-100 pt-3.5 space-y-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Actions</span>
@@ -646,26 +860,23 @@ export function TaskDetailModal({ item, onClose }: Props) {
                           Mark In Progress
                         </button>
                       )}
-                      {isAssignee && st.status === 'In progress' && (
+                       {isAssignee && st.status === 'In progress' && (
                         <button
-                          onClick={() => { useSpecialTaskStore.getState().setStatus(st.id, 'In review'); onClose() }}
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to submit this task for review?')) {
+                              useSpecialTaskStore.getState().setStatus(st.id, 'In review')
+                              onClose()
+                            }
+                          }}
                           className="flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
                         >
                           Submit for Review
                         </button>
                       )}
-                      {isAssignee && st.status === 'In review' && (
-                        <button
-                          onClick={() => { useSpecialTaskStore.getState().setStatus(st.id, 'In progress'); onClose() }}
-                          className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-                        >
-                          Undo Submit (back to In Progress)
-                        </button>
-                      )}
                       {isAssignee && st.status === 'Completed' && (
                         <button
                           onClick={() => { useSpecialTaskStore.getState().setStatus(st.id, 'In progress'); onClose() }}
-                          className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                          className="flex-1 rounded-lg border border-slate-200 bg-card px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
                         >
                           Undo (back to In Progress)
                         </button>

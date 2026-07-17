@@ -15,10 +15,10 @@ type JDMySortKey = 'work_details' | 'status' | 'daily' | 'weekly' | 'monthly'
 type JDTeamSortKey = 'work_details' | 'assigned_to' | 'manager' | 'status' | 'daily' | 'weekly' | 'monthly'
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
-  if (!active) return <ChevronsUpDown size={12} className="text-slate-300 ml-1 inline shrink-0" />
+  if (!active) return <ChevronsUpDown size={12} className="text-muted-foreground ml-1 inline shrink-0" />
   return dir === 'asc'
-    ? <ChevronUp size={12} className="text-blue-500 ml-1 inline shrink-0" />
-    : <ChevronDown size={12} className="text-blue-500 ml-1 inline shrink-0" />
+    ? <ChevronUp size={12} className="text-primary ml-1 inline shrink-0" />
+    : <ChevronDown size={12} className="text-primary ml-1 inline shrink-0" />
 }
 import type { JobDirection, JDHistoryRow } from '@/types/database'
 import { Button } from '@/components/ui/Button'
@@ -27,12 +27,17 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/Dialog'
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue, NativeSelect,
 } from '@/components/ui/Select'
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 import { Avatar } from '@/components/ui/Avatar'
 import { useProfileStore } from '@/store/profileStore'
 import { usePermissionStore } from '@/store/permissionStore'
+import { useReportingStore } from '@/store/reportingStore'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { StatChip, StatChipRow } from '@/components/shared/StatChip'
+import { FilterBar } from '@/components/shared/FilterBar'
 
 const ROLE_ORDER: Record<string, number> = {
   executive: 0,
@@ -45,56 +50,27 @@ const ROLE_ORDER: Record<string, number> = {
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-const STATUS_COLORS: Record<string, string> = {
-  active:              'bg-blue-100 text-blue-700',
-  submitted:           'bg-amber-100 text-amber-700',
-  approved:            'bg-emerald-100 text-emerald-700',
-  rejected:            'bg-red-100 text-red-700',
-  completed:           'bg-slate-100 text-slate-600',
-  deletion_requested:  'bg-red-100 text-red-700',
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  active:              'Active',
-  submitted:           'Under Review',
-  approved:            'Approved',
-  rejected:            'Changes Needed',
-  completed:           'Completed',
-  deletion_requested:  'Deletion Pending',
-}
-
-// ─── KPI Card ─────────────────────────────────────────────────────────────────
-
-function KPICard({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className="rounded-2xl bg-white border border-slate-100 shadow-sm px-5 py-4">
-      <p className="text-xs font-medium text-slate-500 mb-1">{label}</p>
-      <p className={cn('text-2xl font-bold tabular-nums', color)}>{value}</p>
-    </div>
-  )
-}
-
 // ─── Progress Bar ─────────────────────────────────────────────────────────
 
 function ProgressBar({ completed, target, status }: { completed: number; target: number; status: string }) {
   const pct = target > 0 ? (completed / target) * 100 : 0
   const color = {
-    active:    'bg-blue-500',
+    active:    'bg-primary',
     submitted: 'bg-amber-500',
     approved:  'bg-emerald-500',
     rejected:  'bg-red-400',
-    completed: 'bg-slate-400',
-  }[status] || 'bg-slate-400'
+    completed: 'bg-muted-foreground/40',
+  }[status] || 'bg-muted-foreground/40'
 
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 rounded-full bg-slate-100">
+      <div className="flex-1 h-1.5 rounded-full bg-muted">
         <div
           className={cn('h-full rounded-full transition-all', color)}
           style={{ width: `${Math.min(100, pct)}%` }}
         />
       </div>
-      <span className="text-xs font-semibold tabular-nums text-slate-600 w-10 text-right shrink-0">
+      <span className="text-xs font-semibold tabular-nums text-muted-foreground w-10 text-right shrink-0">
         {pct.toFixed(0)}%
       </span>
     </div>
@@ -102,14 +78,102 @@ function ProgressBar({ completed, target, status }: { completed: number; target:
 }
 
 function PeriodProgress({ completed, target, status, label }: { completed: number; target: number; status: string; label: string }) {
-  if (!target || target <= 0) return <span className="text-xs text-slate-400">—</span>
+  if (!target || target <= 0) return <span className="text-xs text-muted-foreground">—</span>
 
   return (
     <div className="space-y-1 min-w-[120px]">
       <ProgressBar completed={completed} target={target} status={status} />
-      <p className="text-[10px] text-slate-400 tabular-nums font-medium">
+      <p className="text-[10px] text-muted-foreground tabular-nums font-medium">
         {label}: {completed} / {target}
       </p>
+    </div>
+  )
+}
+
+function MobileJDTargetProgress({ jd }: { jd: JobDirection }) {
+  const targets = [
+    { label: 'Daily', completed: jd.daily_completed, target: jd.daily_target },
+    { label: 'Weekly', completed: jd.weekly_completed, target: jd.weekly_target },
+    { label: 'Monthly', completed: jd.monthly_completed, target: jd.monthly_target },
+  ].filter(t => t.target > 0)
+
+  if (targets.length === 0) {
+    return (
+      <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-400 italic">
+        <span>No numeric targets set</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-3.5 grid grid-cols-3 gap-2.5 border-t border-slate-100 pt-3">
+      {targets.map(t => {
+        const pct = t.target > 0 ? Math.min(100, Math.round((t.completed / t.target) * 100)) : 0
+        const barColor = pct >= 100 ? 'bg-emerald-500'
+                       : pct >= 50  ? 'bg-blue-500'
+                       : pct >= 20  ? 'bg-amber-500'
+                       : 'bg-slate-300'
+        return (
+          <div key={t.label} className="flex flex-col">
+            <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+              <span>{t.label}</span>
+              <span className="tabular-nums font-extrabold text-slate-700">{pct}%</span>
+            </div>
+            <div className="mt-1 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+              <div
+                className={cn('h-full rounded-full transition-all duration-300', barColor)}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <span className="text-[10px] tabular-nums text-slate-500 font-medium mt-1">
+              {t.completed} / {t.target}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function MobileHistoryCard({ row, showEmployee }: { row: JDHistoryRow; showEmployee?: boolean }) {
+  const pct = row.monthly_target > 0 ? Math.min(100, Math.round((row.monthly_achieved / row.monthly_target) * 100)) : null
+  const barColor = pct === null ? 'bg-slate-300'
+                 : pct >= 100 ? 'bg-emerald-500'
+                 : pct >= 60  ? 'bg-blue-500'
+                 : 'bg-amber-400'
+
+  return (
+    <div className="p-4 bg-card rounded-xl border border-border shadow-sm flex flex-col gap-1">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-800 line-clamp-2 flex-1">
+          {row.work_details || '—'}
+        </p>
+        <StatusBadge status={row.status} className="shrink-0 whitespace-nowrap text-[10px] uppercase font-bold" />
+      </div>
+      {showEmployee && (
+        <p className="text-xs text-slate-400 mt-0.5">Employee: {row.employee_name}</p>
+      )}
+      <div className="mt-3 border-t border-slate-100 pt-2.5">
+        {pct !== null ? (
+          <div>
+            <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+              <span>Monthly Progress</span>
+              <span className="tabular-nums font-extrabold text-slate-700">{pct}%</span>
+            </div>
+            <div className="mt-1 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+              <div
+                className={cn('h-full rounded-full transition-all duration-300', barColor)}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <span className="text-[10px] tabular-nums text-slate-500 font-medium mt-1 block">
+              Achieved: {row.monthly_achieved} / {row.monthly_target}
+            </span>
+          </div>
+        ) : (
+          <span className="text-xs text-slate-400 italic">No targets set for this month</span>
+        )}
+      </div>
     </div>
   )
 }
@@ -127,15 +191,15 @@ function DirectionRow({
   return (
     <tr
       onClick={onClick}
-      className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors cursor-pointer"
+      className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors cursor-pointer"
     >
       {/* Work Details */}
       <td className="py-4 px-5 max-w-[220px]">
-        <p className={cn('text-sm font-medium leading-snug truncate', jd.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-800')}>
+        <p className={cn('text-sm font-medium leading-snug truncate', jd.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground')}>
           {jd.work_details || '—'}
         </p>
         {jd.description && (
-          <p className="text-xs text-slate-400 truncate mt-0.5">{jd.description}</p>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">{jd.description}</p>
         )}
       </td>
 
@@ -156,9 +220,7 @@ function DirectionRow({
 
       {/* Status */}
       <td className="py-4 px-5 whitespace-nowrap">
-        <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold', STATUS_COLORS[jd.status])}>
-          {STATUS_LABELS[jd.status] || jd.status}
-        </span>
+        <StatusBadge status={jd.status} />
       </td>
 
       {/* Actions */}
@@ -177,7 +239,7 @@ function DirectionRow({
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); setConfirmRequest(false) }}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
+                className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
               >
                 No
               </button>
@@ -185,7 +247,7 @@ function DirectionRow({
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); setConfirmRequest(true) }}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"
             >
               <Trash2 size={12} />
               Delete
@@ -214,29 +276,29 @@ function TeamDirectionRow({ jd, onClick }: { jd: JobDirection; onClick?: () => v
   return (
     <tr
       onClick={onClick}
-      className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors cursor-pointer"
+      className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors cursor-pointer"
     >
       <td className="py-4 px-5 max-w-[220px]">
-        <p className={cn('text-sm font-medium leading-snug truncate', jd.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-800')}>
+        <p className={cn('text-sm font-medium leading-snug truncate', jd.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground')}>
           {jd.work_details || '—'}
         </p>
         {jd.description && (
-          <p className="text-xs text-slate-400 truncate mt-0.5">{jd.description}</p>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">{jd.description}</p>
         )}
       </td>
       <td className="py-4 px-5 whitespace-nowrap">
         <div className="flex items-center gap-2">
           <Avatar name={employee?.full_name ?? '?'} size="xs" />
           <div>
-            <p className="text-sm text-slate-700 font-medium leading-tight">{employee?.full_name ?? '—'}</p>
-            <p className="text-xs text-slate-400 capitalize">{employee?.role?.replace('_', ' ') ?? ''}</p>
+            <p className="text-sm text-foreground font-medium leading-tight">{employee?.full_name ?? '—'}</p>
+            <p className="text-xs text-muted-foreground capitalize">{employee?.role?.replace('_', ' ') ?? ''}</p>
           </div>
         </div>
       </td>
       <td className="py-4 px-5 whitespace-nowrap">
         <div className="flex items-center gap-2">
           <Avatar name={manager?.full_name ?? '?'} size="xs" />
-          <span className="text-sm text-slate-600">{manager?.full_name ?? '—'}</span>
+          <span className="text-sm text-muted-foreground">{manager?.full_name ?? '—'}</span>
         </div>
       </td>
       <td className="py-4 px-5">
@@ -249,9 +311,7 @@ function TeamDirectionRow({ jd, onClick }: { jd: JobDirection; onClick?: () => v
         <PeriodProgress completed={jd.monthly_completed} target={jd.monthly_target} status={jd.status} label="Monthly" />
       </td>
       <td className="py-4 px-5 whitespace-nowrap">
-        <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold', STATUS_COLORS[jd.status])}>
-          {STATUS_LABELS[jd.status] || jd.status}
-        </span>
+        <StatusBadge status={jd.status} />
       </td>
       <td className="py-4 px-5 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
         {canDelete && (
@@ -266,7 +326,7 @@ function TeamDirectionRow({ jd, onClick }: { jd: JobDirection; onClick?: () => v
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); setConfirmDelete(false) }}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
+                className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
               >
                 No
               </button>
@@ -274,7 +334,7 @@ function TeamDirectionRow({ jd, onClick }: { jd: JobDirection; onClick?: () => v
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); setConfirmDelete(true) }}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"
             >
               <Trash2 size={12} />
               Delete
@@ -427,35 +487,35 @@ export function AddDirectionModal({ open, onClose, defaultAssigneeId }: AddDirec
                   <ChevronDown size={15} className="ml-2 shrink-0 opacity-50" />
                 </button>
                 {assigneeOpen && (
-                  <div className="absolute z-[200] mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-xl overflow-hidden">
-                    <div className="p-2 border-b border-slate-100">
-                      <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-                        <Search size={13} className="shrink-0 text-slate-400" />
+                  <div className="absolute z-[200] mt-1 w-full rounded-lg border border-border bg-card shadow-xl overflow-hidden">
+                    <div className="p-2 border-b border-border">
+                      <div className="flex items-center gap-2 rounded-md border border-border bg-muted px-2.5 py-1.5">
+                        <Search size={13} className="shrink-0 text-muted-foreground" />
                         <input
                           autoFocus
                           value={assigneeSearch}
                           onChange={(e) => setAssigneeSearch(e.target.value)}
                           placeholder="Search employees..."
-                          className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
+                          className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
                         />
                         {assigneeSearch && (
                           <button type="button" onClick={() => setAssigneeSearch('')}>
-                            <X size={12} className="text-slate-400 hover:text-slate-600" />
+                            <X size={12} className="text-muted-foreground hover:text-muted-foreground" />
                           </button>
                         )}
                       </div>
                     </div>
                     <div className="max-h-48 overflow-y-auto">
                       {filteredAssignees.length === 0 ? (
-                        <p className="px-3 py-3 text-sm text-slate-400 text-center">No employees found.</p>
+                        <p className="px-3 py-3 text-sm text-muted-foreground text-center">No employees found.</p>
                       ) : filteredAssignees.map((p) => (
                         <button
                           key={p.id}
                           type="button"
                           onClick={() => { setAssigneeId(p.id); setAssigneeOpen(false); setAssigneeSearch('') }}
                           className={cn(
-                            'w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors',
-                            p.id === assigneeId && 'bg-blue-50 text-blue-700 font-medium'
+                            'w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors',
+                            p.id === assigneeId && 'bg-primary/10 text-primary font-medium'
                           )}
                         >
                           {p.full_name}{p.id === user?.id ? ' (You)' : ''} — {p.role}
@@ -498,9 +558,9 @@ export function AddDirectionModal({ open, onClose, defaultAssigneeId }: AddDirec
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Targets</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Targets</h4>
               <label className="flex items-center gap-2 cursor-pointer select-none">
-                <span className="text-xs text-slate-500">Set targets</span>
+                <span className="text-xs text-muted-foreground">Set targets</span>
                 <button
                   type="button"
                   role="switch"
@@ -508,11 +568,11 @@ export function AddDirectionModal({ open, onClose, defaultAssigneeId }: AddDirec
                   onClick={() => setForm((f) => ({ ...f, has_targets: !f.has_targets }))}
                   className={cn(
                     'relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none',
-                    form.has_targets ? 'bg-blue-600' : 'bg-slate-200'
+                    form.has_targets ? 'bg-primary' : 'bg-muted'
                   )}
                 >
                   <span className={cn(
-                    'inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200',
+                    'inline-block h-4 w-4 transform rounded-full bg-card shadow transition duration-200',
                     form.has_targets ? 'translate-x-4' : 'translate-x-0'
                   )} />
                 </button>
@@ -547,7 +607,7 @@ export function AddDirectionModal({ open, onClose, defaultAssigneeId }: AddDirec
               </div>
             )}
             {!form.has_targets && (
-              <p className="text-xs text-slate-400 italic">
+              <p className="text-xs text-muted-foreground italic">
                 This direction will be tracked by completion only, with no numeric targets.
               </p>
             )}
@@ -592,6 +652,11 @@ export function JobDirections() {
   const allDirections  = useJobDirectionStore((s) => s.directions)
   const fetchHistory   = useJobDirectionStore((s) => s.fetchMonthlyHistory)
   const profiles       = useProfileStore((s) => s.profiles)
+  const reportingRecords = useReportingStore((s) => s.reportingRecords)
+
+  const isExcluded = ['hr', 'managing_director', 'executive_assistant'].includes(user?.role || '')
+  const hasReportees = reportingRecords.some((r) => r.reporting_to_id === user?.id)
+  const showTeam = isExcluded || hasReportees
 
   const location = useLocation()
 
@@ -654,6 +719,7 @@ export function JobDirections() {
   const activeCount    = myDirections.filter((d) => ['active', 'approved'].includes(d.status)).length
   const approvedCount  = myDirections.filter((d) => ['active', 'completed', 'approved'].includes(d.status)).length
   const completedCount = myDirections.filter((d) => d.status === 'completed').length
+  const deletionRequestedCount = myDirections.filter((d) => d.status === 'deletion_requested').length
 
   const JD_STATUS_ORDER: Record<string, number> = { active: 0, submitted: 1, approved: 2, rejected: 3, deletion_requested: 4, completed: 5 }
 
@@ -723,178 +789,143 @@ export function JobDirections() {
   const activeTeam = teamDirections.filter((d) => d.status !== 'completed').length
 
   return (
-    <div className="space-y-6">
-      {/* ── Page header ── */}
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Job Directions</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Track your goals and what's assigned across your team</p>
-        </div>
-        {canCreateJD && (
+    <div className="space-y-5">
+      {/* ── Page header + primary tabs ── */}
+      <PageHeader
+        title="Job Directions"
+        description="Track your goals and what's assigned across your team"
+        actions={canCreateJD ? (
           <Button size="sm" onClick={() => setShowAdd(true)}>
             <Plus size={14} />
             New Direction
           </Button>
-        )}
-      </div>
-
-      {/* ── Primary tab switcher ── */}
-      <div className="flex gap-1 border-b border-slate-200">
-        <button
-          onClick={() => setViewMode('mine')}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px',
-            viewMode === 'mine'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          )}
-        >
-          <ClipboardList size={15} />
-          My Directions
-          <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-bold',
-            viewMode === 'mine' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500')}>
-            {myDirections.length}
-          </span>
-        </button>
-        <button
-          onClick={() => setViewMode('team')}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px',
-            viewMode === 'team'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          )}
-        >
-          <Users size={15} />
-          Team
-          {activeTeam > 0 && (
+        ) : undefined}
+      >
+        <div className="flex gap-1 border-b border-border">
+          <button
+            onClick={() => setViewMode('mine')}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px',
+              viewMode === 'mine'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <ClipboardList size={15} />
+            My Directions
             <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-bold',
-              viewMode === 'team' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500')}>
-              {activeTeam}
+              viewMode === 'mine' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
+              {myDirections.length}
             </span>
+          </button>
+          {showTeam && (
+            <button
+              onClick={() => setViewMode('team')}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px',
+                viewMode === 'team'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Users size={15} />
+              Team
+              {activeTeam > 0 && (
+                <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-bold',
+                  viewMode === 'team' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
+                  {activeTeam}
+                </span>
+              )}
+            </button>
           )}
-        </button>
-        <button
-          onClick={() => setViewMode('history')}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px',
-            viewMode === 'history'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          )}
-        >
-          <History size={15} />
-          History
-        </button>
-      </div>
-
-      {/* ── KPI Strip — My Directions only ── */}
-      {viewMode === 'mine' && (
-        <div className="grid grid-cols-3 gap-3">
-          <KPICard label="Active"    value={activeCount}    color="text-blue-600" />
-          <KPICard label="Approved"  value={approvedCount}  color="text-emerald-600" />
-          <KPICard label="Completed" value={completedCount} color="text-slate-600" />
+          <button
+            onClick={() => setViewMode('history')}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px',
+              viewMode === 'history'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <History size={15} />
+            History
+          </button>
         </div>
+      </PageHeader>
+
+      {/* ── My Directions: compact click-to-filter chips (replaces KPI cards + sub-tabs) ── */}
+      {viewMode === 'mine' && (
+        <StatChipRow>
+          <StatChip
+            label="Active" value={activeCount}
+            onClick={() => setFilterTab(filterTab === 'active' ? 'all' : 'active')}
+            active={filterTab === 'active'}
+          />
+          <StatChip label="Approved"  value={approvedCount}  tone="success" />
+          <StatChip label="Completed" value={completedCount} />
+          {deletionRequestedCount > 0 && (
+            <StatChip
+              label="Deletion Requested" value={deletionRequestedCount} tone="warn"
+              onClick={() => setFilterTab(filterTab === 'deletion_requested' ? 'all' : 'deletion_requested')}
+              active={filterTab === 'deletion_requested'}
+            />
+          )}
+        </StatChipRow>
+      )}
+
+      {/* ── Team: one-row toolbar ── */}
+      {viewMode === 'team' && (
+        <FilterBar
+          search={teamSearch}
+          onSearchChange={setTeamSearch}
+          searchPlaceholder="Search directions, people…"
+          summary={`${filteredTeam.length} of ${teamDirections.length} directions`}
+          filters={
+            <>
+              {showBranchFilter && (
+                <NativeSelect
+                  value={teamBranch}
+                  onChange={(e) => setTeamBranch(e.target.value)}
+                  className="rounded-lg border border-border bg-card py-2 pl-3 pr-8 text-sm text-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                >
+                  <option value="all">All Branches</option>
+                  {availableBranches.map((b) => <option key={b} value={b}>{b}</option>)}
+                </NativeSelect>
+              )}
+              {showDeptFilter && (
+                <NativeSelect
+                  value={teamDept}
+                  onChange={(e) => setTeamDept(e.target.value)}
+                  className="rounded-lg border border-border bg-card py-2 pl-3 pr-8 text-sm text-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                >
+                  <option value="all">All Departments</option>
+                  {availableDepartments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </NativeSelect>
+              )}
+              <Select value={teamEmployee} onValueChange={setTeamEmployee}>
+                <SelectTrigger className="w-[180px] text-sm">
+                  <SelectValue placeholder="All employees" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All employees</SelectItem>
+                  {teamEmployees.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          }
+        />
       )}
 
       {/* ── Main card ── */}
-      <div className="rounded-2xl bg-white border border-slate-100 shadow-sm">
-
-        {/* My Directions: status sub-tabs */}
-        {viewMode === 'mine' && (
-          <div className="flex items-center gap-0.5 border-b border-slate-100 px-4 pt-3 pb-0 overflow-x-auto">
-            {FILTER_TABS.map((tab) => {
-              const count = tab.value === 'all' ? myDirections.length
-                : tab.value === 'active'
-                  ? myDirections.filter((d) => ['active', 'approved'].includes(d.status)).length
-                  : myDirections.filter((d) => d.status === tab.value).length
-              return (
-                <button
-                  key={tab.value}
-                  onClick={() => setFilterTab(tab.value)}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors',
-                    filterTab === tab.value
-                      ? 'border-blue-600 text-blue-700'
-                      : 'border-transparent text-slate-500 hover:text-slate-700'
-                  )}
-                >
-                  {tab.label}
-                  <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
-                    filterTab === tab.value ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500')}>
-                    {count}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Team: search + filters */}
-        {viewMode === 'team' && (
-          <div className="border-b border-slate-100 px-4 py-3 flex flex-wrap items-center gap-3">
-            {/* Branch filter — MD / EA / HR only */}
-            {showBranchFilter && (
-              <select
-                value={teamBranch}
-                onChange={(e) => setTeamBranch(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm text-slate-700 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
-              >
-                <option value="all">All Branches</option>
-                {availableBranches.map((b) => <option key={b} value={b}>{b}</option>)}
-              </select>
-            )}
-
-            {/* Department filter — MD / EA / HR / Director */}
-            {showDeptFilter && (
-              <select
-                value={teamDept}
-                onChange={(e) => setTeamDept(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm text-slate-700 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
-              >
-                <option value="all">All Departments</option>
-                {availableDepartments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            )}
-
-            <div className="relative flex-1 min-w-[180px]">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search directions, people…"
-                value={teamSearch}
-                onChange={(e) => setTeamSearch(e.target.value)}
-                className="w-full pl-8 pr-8 py-2 text-sm rounded-lg border border-slate-200 bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition"
-              />
-              {teamSearch && (
-                <button onClick={() => setTeamSearch('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                  <X size={13} />
-                </button>
-              )}
-            </div>
-            <Select value={teamEmployee} onValueChange={setTeamEmployee}>
-              <SelectTrigger className="w-[180px] text-sm">
-                <SelectValue placeholder="All employees" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All employees</SelectItem>
-                {teamEmployees.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-slate-400 ml-auto whitespace-nowrap">
-              {filteredTeam.length} of {teamDirections.length} directions
-            </p>
-          </div>
-        )}
+      <div className="sm:rounded-xl sm:bg-card sm:border sm:border-border sm:shadow-card overflow-hidden">
 
         {/* My Directions */}
         {viewMode === 'mine' && (
           filteredMine.length === 0 ? (
             <div className="px-6 py-12 text-center">
-              <p className="text-sm text-slate-400">No directions in this category.</p>
+              <p className="text-sm text-muted-foreground">No directions in this category.</p>
               {filterTab === 'all' && canCreateJD && (
                 <Button size="sm" variant="outline" className="mt-4" onClick={() => setShowAdd(true)}>
                   <Plus size={14} /> Add your first direction
@@ -904,22 +935,26 @@ export function JobDirections() {
           ) : (
             <>
               {/* Mobile: card list */}
-              <div className="divide-y divide-slate-100 sm:hidden">
+              <div className="sm:hidden space-y-3 px-1 py-1">
                 {filteredMine.map((jd) => (
-                  <div key={jd.id} onClick={() => setSelectedDetail({ kind: 'jd', data: jd })} className="px-4 py-3 hover:bg-slate-50/70 cursor-pointer active:bg-slate-100">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className={cn('text-sm font-medium leading-snug flex-1', jd.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-800')}>{jd.work_details || '—'}</p>
-                      <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap', STATUS_COLORS[jd.status])}>{STATUS_LABELS[jd.status] || jd.status}</span>
+                  <div
+                    key={jd.id}
+                    onClick={() => setSelectedDetail({ kind: 'jd', data: jd })}
+                    className="p-4 bg-card rounded-xl border border-border shadow-sm hover:shadow-md hover:border-slate-300 transition-all cursor-pointer active:scale-[0.99] flex flex-col"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className={cn(
+                        'text-sm font-semibold leading-snug flex-1 text-slate-800',
+                        jd.status === 'completed' && 'line-through text-slate-400'
+                      )}>
+                        {jd.work_details || '—'}
+                      </p>
+                      <StatusBadge status={jd.status} className="shrink-0 whitespace-nowrap text-[10px] uppercase font-bold" />
                     </div>
                     {jd.description && (
-                      <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">{jd.description}</p>
+                      <p className="text-xs text-slate-400 line-clamp-2 mt-1">{jd.description}</p>
                     )}
-                    <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
-                      {jd.daily_target > 0 && <span>Daily: {jd.daily_completed}/{jd.daily_target}</span>}
-                      {jd.weekly_target > 0 && <span>Weekly: {jd.weekly_completed}/{jd.weekly_target}</span>}
-                      {jd.monthly_target > 0 && <span>Monthly: {jd.monthly_completed}/{jd.monthly_target}</span>}
-                      {!jd.daily_target && !jd.weekly_target && !jd.monthly_target && <span className="text-slate-400 italic">No targets</span>}
-                    </div>
+                    <MobileJDTargetProgress jd={jd} />
                   </div>
                 ))}
               </div>
@@ -927,7 +962,7 @@ export function JobDirections() {
               <div className="hidden sm:block overflow-x-auto">
                 <table className="min-w-full">
                   <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50/50">
+                    <tr className="border-b border-border bg-muted/50">
                       {([
                         { key: 'work_details' as JDMySortKey, label: 'Work Details', cls: '' },
                         { key: 'daily' as JDMySortKey, label: 'Daily Progress', cls: 'w-40' },
@@ -935,13 +970,13 @@ export function JobDirections() {
                         { key: 'monthly' as JDMySortKey, label: 'Monthly Progress', cls: 'w-40' },
                         { key: 'status' as JDMySortKey, label: 'Status', cls: '' },
                       ]).map(({ key, label, cls }) => (
-                        <th key={key} className={`py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 ${cls}`}>
-                          <button onClick={() => toggleMySort(key)} className="flex items-center hover:text-blue-600 transition-colors">
+                        <th key={key} className={`py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground ${cls}`}>
+                          <button onClick={() => toggleMySort(key)} className="flex items-center hover:text-primary transition-colors">
                             {label}<SortIcon active={mySortKey === key} dir={mySortDir} />
                           </button>
                         </th>
                       ))}
-                      <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">Actions</th>
+                      <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -978,116 +1013,126 @@ export function JobDirections() {
 
           function HistoryTable({ rows }: { rows: JDHistoryRow[] }) {
             if (rows.length === 0) {
-              return <p className="px-6 py-8 text-center text-sm text-slate-400">No data for this month.</p>
+              return <p className="px-6 py-8 text-center text-sm text-muted-foreground">No data for this month.</p>
             }
             return (
-              <table className="min-w-full">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/50">
-                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">Work Details</th>
-                    {histTeamPeople.length > 0 && rows === filteredTeamHistory && (
-                      <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-40">Employee</th>
-                    )}
-                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-32">Monthly Target</th>
-                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-32">Achieved</th>
-                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-44">Completion</th>
-                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 w-28">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {rows.map((row) => {
-                    const pct = row.monthly_target > 0
-                      ? Math.min(100, (row.monthly_achieved / row.monthly_target) * 100)
-                      : null
-                    const barColor = pct === null ? 'bg-slate-300'
-                      : pct >= 100 ? 'bg-emerald-500'
-                      : pct >= 60  ? 'bg-blue-500'
-                      : 'bg-amber-400'
-                    return (
-                      <tr key={row.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="py-3 px-5 text-sm text-slate-800 max-w-[260px]">
-                          <span className="line-clamp-2">{row.work_details || '—'}</span>
-                        </td>
+              <>
+                {/* Mobile History View */}
+                <div className="sm:hidden space-y-3.5 px-3 py-2 bg-slate-50/30">
+                  {rows.map((row) => (
+                    <MobileHistoryCard key={row.id} row={row} showEmployee={histTeamPeople.length > 0 && rows === filteredTeamHistory} />
+                  ))}
+                </div>
+
+                {/* Desktop History Table */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/50">
+                        <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Work Details</th>
                         {histTeamPeople.length > 0 && rows === filteredTeamHistory && (
-                          <td className="py-3 px-5 text-sm text-slate-600 whitespace-nowrap">{row.employee_name}</td>
+                          <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground w-40">Employee</th>
                         )}
-                        <td className="py-3 px-5 text-sm tabular-nums text-slate-600">
-                          {row.monthly_target > 0 ? row.monthly_target : <span className="text-slate-300">—</span>}
-                        </td>
-                        <td className="py-3 px-5 text-sm tabular-nums font-semibold text-slate-800">
-                          {row.monthly_achieved > 0 ? row.monthly_achieved : <span className="text-slate-300 font-normal">0</span>}
-                        </td>
-                        <td className="py-3 px-5">
-                          {pct !== null ? (
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 h-1.5 rounded-full bg-slate-100">
-                                <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pct}%` }} />
-                              </div>
-                              <span className="text-xs font-semibold tabular-nums text-slate-600 w-9 text-right shrink-0">
-                                {pct.toFixed(0)}%
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-slate-300">No target</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-5">
-                          <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', STATUS_COLORS[row.status] ?? 'bg-slate-100 text-slate-500')}>
-                            {STATUS_LABELS[row.status] ?? row.status}
-                          </span>
-                        </td>
+                        <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground w-32">Monthly Target</th>
+                        <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground w-32">Achieved</th>
+                        <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground w-44">Completion</th>
+                        <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground w-28">Status</th>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {rows.map((row) => {
+                        const pct = row.monthly_target > 0
+                          ? Math.min(100, (row.monthly_achieved / row.monthly_target) * 100)
+                          : null
+                        const barColor = pct === null ? 'bg-muted-foreground/30'
+                          : pct >= 100 ? 'bg-emerald-500'
+                          : pct >= 60  ? 'bg-primary'
+                          : 'bg-amber-400'
+                        return (
+                          <tr key={row.id} className="hover:bg-muted/60 transition-colors">
+                            <td className="py-3 px-5 text-sm text-foreground max-w-[260px]">
+                              <span className="line-clamp-2">{row.work_details || '—'}</span>
+                            </td>
+                            {histTeamPeople.length > 0 && rows === filteredTeamHistory && (
+                              <td className="py-3 px-5 text-sm text-muted-foreground whitespace-nowrap">{row.employee_name}</td>
+                            )}
+                            <td className="py-3 px-5 text-sm tabular-nums text-muted-foreground">
+                              {row.monthly_target > 0 ? row.monthly_target : <span className="text-muted-foreground">—</span>}
+                            </td>
+                            <td className="py-3 px-5 text-sm tabular-nums font-semibold text-foreground">
+                              {row.monthly_achieved > 0 ? row.monthly_achieved : <span className="text-muted-foreground font-normal">0</span>}
+                            </td>
+                            <td className="py-3 px-5">
+                              {pct !== null ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 h-1.5 rounded-full bg-muted">
+                                    <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pct}%` }} />
+                                  </div>
+                                  <span className="text-xs font-semibold tabular-nums text-muted-foreground w-9 text-right shrink-0">
+                                    {pct.toFixed(0)}%
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">No target</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-5">
+                              <StatusBadge status={row.status} />
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )
           }
 
           return (
             <div>
               {/* Controls */}
-              <div className="border-b border-slate-100 px-4 py-3 flex flex-wrap items-center gap-3">
-                <select
+              <div className="border-b border-border px-4 py-3 flex flex-wrap items-center gap-3">
+                <NativeSelect
                   value={`${histYear}-${histMonth}`}
                   onChange={(e) => {
                     const [y, m] = e.target.value.split('-').map(Number)
                     setHistYear(y); setHistMonth(m)
                   }}
-                  className="rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm text-slate-700 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                  className="rounded-lg border border-border bg-card py-2 pl-3 pr-8 text-sm text-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
                 >
                   {monthOptions.map((o) => (
                     <option key={`${o.year}-${o.month}`} value={`${o.year}-${o.month}`}>{o.label}</option>
                   ))}
-                </select>
+                </NativeSelect>
                 {histTeamPeople.length > 0 && (
-                  <select
+                  <NativeSelect
                     value={histEmployee}
                     onChange={(e) => setHistEmployee(e.target.value)}
-                    className="rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm text-slate-700 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                    className="rounded-lg border border-border bg-card py-2 pl-3 pr-8 text-sm text-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
                   >
                     <option value="all">All employees</option>
                     {histTeamPeople.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-                  </select>
+                  </NativeSelect>
                 )}
-                {histLoading && <span className="text-xs text-slate-400 animate-pulse">Loading…</span>}
+                {histLoading && <span className="text-xs text-muted-foreground animate-pulse">Loading…</span>}
               </div>
 
               {histLoading ? (
-                <div className="px-6 py-10 text-center text-sm text-slate-400 animate-pulse">Fetching history…</div>
+                <div className="px-6 py-10 text-center text-sm text-muted-foreground animate-pulse">Fetching history…</div>
               ) : (
                 <div className="overflow-x-auto">
                   {/* My section */}
                   <div className="px-5 pt-4 pb-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">My Directions</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">My Directions</p>
                   </div>
                   <HistoryTable rows={myHistory} />
 
                   {/* Team section — only if there's team data */}
                   {teamHistory.length > 0 && (
                     <>
-                      <div className="px-5 pt-5 pb-1 border-t border-slate-100">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Team</p>
+                      <div className="px-5 pt-5 pb-1 border-t border-border">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Team</p>
                       </div>
                       <HistoryTable rows={filteredTeamHistory} />
                     </>
@@ -1101,39 +1146,48 @@ export function JobDirections() {
         {/* Team directions */}
         {viewMode === 'team' && (
           filteredTeam.length === 0 ? (
-            <div className="px-6 py-10 text-center text-sm text-slate-400">
+            <div className="px-6 py-10 text-center text-sm text-muted-foreground">
               {teamSearch || teamEmployee !== 'all' ? 'No directions match your filters.' : 'No team directions yet.'}
             </div>
           ) : (
             <>
               {/* Mobile: card list */}
-              <div className="divide-y divide-slate-100 sm:hidden">
+              <div className="sm:hidden space-y-3.5 px-1 py-1">
                 {filteredTeam.map((jd) => {
                   const employee = profiles.find((p) => p.id === jd.employee_id)
                   const manager = profiles.find((p) => p.id === jd.manager_id)
                   return (
-                    <div key={jd.id} onClick={() => setSelectedDetail({ kind: 'jd', data: jd })} className="px-4 py-3 hover:bg-slate-50/70 cursor-pointer active:bg-slate-100">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className={cn('text-sm font-medium leading-snug flex-1', jd.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-800')}>{jd.work_details || '—'}</p>
-                        <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap', STATUS_COLORS[jd.status])}>{STATUS_LABELS[jd.status] || jd.status}</span>
+                    <div
+                      key={jd.id}
+                      onClick={() => setSelectedDetail({ kind: 'jd', data: jd })}
+                      className="p-4 bg-card rounded-xl border border-border shadow-sm hover:shadow-md hover:border-slate-300 transition-all cursor-pointer active:scale-[0.99] flex flex-col"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className={cn(
+                          'text-sm font-semibold leading-snug flex-1 text-slate-800',
+                          jd.status === 'completed' && 'line-through text-slate-400'
+                        )}>
+                          {jd.work_details || '—'}
+                        </p>
+                        <StatusBadge status={jd.status} className="shrink-0 whitespace-nowrap text-[10px] uppercase font-bold" />
                       </div>
                       {jd.description && (
-                        <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">{jd.description}</p>
+                        <p className="text-xs text-slate-400 line-clamp-2 mt-1">{jd.description}</p>
                       )}
-                      <div className="mt-1.5 flex items-center gap-2">
+                      <div className="mt-2.5 flex items-center gap-2">
                         {employee && (
-                          <>
+                          <div className="flex items-center gap-1.5">
                             <Avatar name={employee.full_name} size="xs" />
-                            <span className="text-xs text-slate-600">{employee.full_name}</span>
-                          </>
+                            <span className="text-xs font-semibold text-slate-600">{employee.full_name}</span>
+                          </div>
                         )}
-                        {manager && <span className="text-xs text-slate-400">· {manager.full_name}</span>}
+                        {manager && (
+                          <span className="text-xs text-slate-400">
+                            (Manager: {manager.full_name})
+                          </span>
+                        )}
                       </div>
-                      <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-500">
-                        {jd.daily_target > 0 && <span>D: {jd.daily_completed}/{jd.daily_target}</span>}
-                        {jd.weekly_target > 0 && <span>W: {jd.weekly_completed}/{jd.weekly_target}</span>}
-                        {jd.monthly_target > 0 && <span>M: {jd.monthly_completed}/{jd.monthly_target}</span>}
-                      </div>
+                      <MobileJDTargetProgress jd={jd} />
                     </div>
                   )
                 })}
@@ -1142,7 +1196,7 @@ export function JobDirections() {
               <div className="hidden sm:block overflow-x-auto">
                 <table className="min-w-full">
                   <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50/50">
+                    <tr className="border-b border-border bg-muted/50">
                       {([
                         { key: 'work_details' as JDTeamSortKey, label: 'Work Details', cls: '' },
                         { key: 'assigned_to' as JDTeamSortKey, label: 'Assigned To', cls: '' },
@@ -1152,13 +1206,13 @@ export function JobDirections() {
                         { key: 'monthly' as JDTeamSortKey, label: 'Monthly Progress', cls: 'w-40' },
                         { key: 'status' as JDTeamSortKey, label: 'Status', cls: '' },
                       ]).map(({ key, label, cls }) => (
-                        <th key={key} className={`py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-400 ${cls}`}>
-                          <button onClick={() => toggleTeamSort(key)} className="flex items-center hover:text-blue-600 transition-colors">
+                        <th key={key} className={`py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground ${cls}`}>
+                          <button onClick={() => toggleTeamSort(key)} className="flex items-center hover:text-primary transition-colors">
                             {label}<SortIcon active={teamSortKey === key} dir={teamSortDir} />
                           </button>
                         </th>
                       ))}
-                      <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">Actions</th>
+                      <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                     </tr>
                   </thead>
                   <tbody>

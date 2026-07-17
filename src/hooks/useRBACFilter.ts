@@ -2,15 +2,16 @@ import { useMemo } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useProfileStore } from '@/store/profileStore'
 import { usePermissionStore } from '@/store/permissionStore'
+import { useReportingStore } from '@/store/reportingStore'
 import type { Profile } from '@/types/database'
 
-function getReportingChain(managerId: string, profiles: Profile[]): Set<string> {
+function getReportingChain(managerId: string, reportingRecords: any[]): Set<string> {
   const chain = new Set<string>()
   function traverse(id: string) {
-    for (const p of profiles) {
-      if (p.manager_id === id && !chain.has(p.id)) {
-        chain.add(p.id)
-        traverse(p.id)
+    for (const r of reportingRecords) {
+      if (r.reporting_to_id === id && !chain.has(r.employee_id)) {
+        chain.add(r.employee_id)
+        traverse(r.employee_id)
       }
     }
   }
@@ -23,6 +24,7 @@ export function useRBACFilter() {
   const profiles = useProfileStore((s) => s.profiles)
   const departments = useProfileStore((s) => s.departments)
   const permissions = usePermissionStore((s) => s.permissions)
+  const reportingRecords = useReportingStore((s) => s.reportingRecords)
 
   // The set of profiles this user is allowed to see in team views
   const allowedProfiles = useMemo((): Profile[] => {
@@ -33,7 +35,7 @@ export function useRBACFilter() {
 
     // Manager — recursive reporting chain (including themselves), same branch
     if (permissions.must_be_in_reporting_chain) {
-      const chain = getReportingChain(user.id, profiles)
+      const chain = getReportingChain(user.id, reportingRecords)
       return profiles.filter((p) => (chain.has(p.id) || p.id === user.id) && p.branch === user.branch)
     }
 
@@ -44,7 +46,7 @@ export function useRBACFilter() {
 
     // Executive — only themselves (team tab will be empty)
     return profiles.filter((p) => p.id === user.id)
-  }, [user, profiles, permissions])
+  }, [user, profiles, permissions, reportingRecords])
 
   const allowedIds = useMemo(
     () => new Set(allowedProfiles.map((p) => p.id)),
