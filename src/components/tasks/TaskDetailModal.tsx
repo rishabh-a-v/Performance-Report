@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  X, Calendar, Compass, ListTodo, CheckCircle2, Circle, Users
+  X, Calendar, Compass, ListTodo, CheckCircle2, Circle, Users, Lock
 } from 'lucide-react'
 import { useJobDirectionStore } from '@/store/jobDirectionStore'
 import { useSpecialTaskStore } from '@/store/specialTaskStore'
@@ -146,6 +146,13 @@ export function TaskDetailModal({ item, onClose, onOpenJob }: Props) {
   )
   const tjCanUpdate = !!tjJob && (tjIsAssignee || tjCanManage) && tjJob.status === 'active'
 
+  // Once a task is Completed (or, for Special Tasks, In review awaiting
+  // approval), its details are frozen — only explicit status actions
+  // (Undo, Approve/Request Revision) can move it out of that state.
+  const isLockedForEdit = isTJT
+    ? tjt?.status === 'Completed'
+    : !isJD && (st?.status === 'Completed' || st?.status === 'In review')
+
   const canEdit = isJD
     ? (
         isJDAdmin ||
@@ -153,8 +160,8 @@ export function TaskDetailModal({ item, onClose, onOpenJob }: Props) {
         (!!jd && jd.employee_id === user?.id)
       )
     : isTJT
-      ? tjCanUpdate
-      : (isAssignee || isAssigner || isSTAdmin)
+      ? tjCanUpdate && !isLockedForEdit
+      : (isAssignee || isAssigner || isSTAdmin) && !isLockedForEdit
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -241,6 +248,11 @@ export function TaskDetailModal({ item, onClose, onOpenJob }: Props) {
             )}
           </div>
           <div className="flex items-center gap-2">
+            {!isJD && isLockedForEdit && (
+              <span className="flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-500">
+                <Lock size={10} /> Locked
+              </span>
+            )}
             {!isEditing && canEdit && (
               <button
                 onClick={() => setIsEditing(true)}

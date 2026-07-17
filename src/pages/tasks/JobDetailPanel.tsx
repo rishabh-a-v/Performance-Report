@@ -288,6 +288,9 @@ export function JobDetailPanel({
                   const assignee   = profiles.find((p) => p.id === task.assignee_id)
                   const StatusIcon = TASK_STATUS_ICON[task.status]
                   const canUpdate  = canUpdateSubTask(task, job, userId, isManagerOrAbove, allowedIds)
+                  // Notes/details are frozen once Completed — the plain status-cycle
+                  // icon above stays available so the task can still be reopened.
+                  const canEditDetails = canUpdate && task.status !== 'Completed'
                   const canDelete  = canManage && job.status === 'active'
 
                   return (
@@ -365,7 +368,7 @@ export function JobDetailPanel({
                         </div>
 
                         <div className="flex items-center gap-1 shrink-0">
-                          {canUpdate && (
+                          {canEditDetails && (
                             <button
                               onClick={() => setUpdatingTask(task)}
                               className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"

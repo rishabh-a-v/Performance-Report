@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { CheckCircle2, Circle, Clock, ClipboardList, Trash2, Edit3 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { CheckCircle2, Circle, Clock, ClipboardList, Trash2, Edit3, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useProfileStore } from '@/store/profileStore'
 import { useSpecialTaskStore } from '@/store/specialTaskStore'
@@ -10,9 +10,41 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { cn, formatDate, todayLocalISO } from '@/lib/utils'
 import {
   canUpdateSubTask, isDone, isOverdue, nextSpecialTaskStatus, nextSubTaskStatus,
-  PRIORITY_LABELS, PRIORITY_STYLES, unifiedDue, unifiedTitle, type UnifiedTask,
+  PRIORITY_LABELS, PRIORITY_ORDER, PRIORITY_STYLES, unifiedDue, unifiedStatus, unifiedTitle, type UnifiedTask,
 } from './taskViewModel'
 import type { SpecialTask, TaskPriority, TeamJob, TeamJobTask } from '@/types/database'
+
+type SortKey = 'task' | 'due' | 'priority' | 'status'
+type Sort = { key: SortKey; dir: 'asc' | 'desc' }
+
+const STATUS_ORDER: Record<string, number> = { 'Yet to start': 0, 'In progress': 1, 'In review': 2, Completed: 3 }
+
+function sortValue(item: UnifiedTask, key: SortKey): string | number {
+  switch (key) {
+    case 'task':     return unifiedTitle(item).toLowerCase()
+    case 'due':       return unifiedDue(item) ?? '9999-99-99'
+    case 'priority': return item.kind === 'st' ? PRIORITY_ORDER[item.task.priority ?? 'medium'] : -1
+    case 'status':    return STATUS_ORDER[unifiedStatus(item)] ?? 0
+  }
+}
+
+function SortableHeader({ label, sortKey, sort, onSort, align = 'left' }: {
+  label: string; sortKey: SortKey; sort: Sort | null; onSort: (k: SortKey) => void; align?: 'left' | 'right'
+}) {
+  const active = sort?.key === sortKey
+  const Icon = active ? (sort!.dir === 'asc' ? ChevronUp : ChevronDown) : ChevronsUpDown
+  return (
+    <th className={cn('py-3 px-5 text-xs font-semibold uppercase tracking-wider text-muted-foreground', align === 'right' ? 'text-right' : 'text-left')}>
+      <button
+        onClick={() => onSort(sortKey)}
+        className={cn('inline-flex items-center gap-1 transition-colors hover:text-foreground', active && 'text-foreground')}
+      >
+        {label}
+        <Icon size={12} className={active ? 'text-foreground' : 'text-muted-foreground/50'} />
+      </button>
+    </th>
+  )
+}
 
 export function PriorityBadge({ priority }: { priority: TaskPriority }) {
   return (
@@ -149,6 +181,26 @@ export interface TaskListProps {
 export function TaskList({ items, context, emptyMessage, isManagerOrAbove, allowedIds, onOpenSt, onOpenTj, onOpenJob }: TaskListProps) {
   const profiles = useProfileStore((s) => s.profiles)
   const today = todayLocalISO()
+
+  const [sort, setSort] = useState<Sort | null>(null)
+  const sortedItems = useMemo(() => {
+    if (!sort) return items
+    const dir = sort.dir === 'asc' ? 1 : -1
+    return [...items].sort((a, b) => {
+      const va = sortValue(a, sort.key), vb = sortValue(b, sort.key)
+      if (va < vb) return -dir
+      if (va > vb) return dir
+      return 0
+    })
+  }, [items, sort])
+
+  function toggleSort(key: SortKey) {
+    setSort((prev) => {
+      if (!prev || prev.key !== key) return { key, dir: 'asc' }
+      if (prev.dir === 'asc') return { key, dir: 'desc' }
+      return null
+    })
+  }
 
   if (items.length === 0) {
     return <EmptyState icon={ClipboardList} message={emptyMessage} />
@@ -309,18 +361,18 @@ export function TaskList({ items, context, emptyMessage, isManagerOrAbove, allow
         <table className="min-w-full">
           <thead>
             <tr className="border-b border-border bg-muted/50">
-              <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Task</th>
+              <SortableHeader label="Task" sortKey="task" sort={sort} onSort={toggleSort} />
               <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {context === 'mine' ? 'From' : 'Assignee'}
               </th>
-              <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Due Date</th>
-              <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Priority</th>
-              <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+              <SortableHeader label="Due Date" sortKey="due" sort={sort} onSort={toggleSort} />
+              <SortableHeader label="Priority" sortKey="priority" sort={sort} onSort={toggleSort} />
+              <SortableHeader label="Status" sortKey="status" sort={sort} onSort={toggleSort} />
               <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => {
+            {sortedItems.map((item) => {
               const overdue = isOverdue(item, today)
               const due = unifiedDue(item)
               return (
