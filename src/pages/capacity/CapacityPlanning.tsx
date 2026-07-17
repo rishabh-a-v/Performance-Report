@@ -7,6 +7,7 @@ import { useSpecialTaskStore } from '@/store/specialTaskStore'
 import { useCapacityStore } from '@/store/capacityStore'
 import { useRBACFilter } from '@/hooks/useRBACFilter'
 import { cn } from '@/lib/utils'
+import { NativeSelect } from '@/components/ui/Select'
 import { CapacityDashboard } from '@/modules/capacity/components/CapacityDashboard'
 
 const ROLE_LABELS: Record<string, string> = {
@@ -19,9 +20,9 @@ const ROLE_LABELS: Record<string, string> = {
 }
 
 const WORKLOAD_BAND = (score: number) => {
-  if (score <= 2) return { label: 'Light',    color: 'bg-emerald-100 text-emerald-700' }
-  if (score <= 5) return { label: 'Moderate', color: 'bg-amber-100  text-amber-700'   }
-  return              { label: 'Heavy',    color: 'bg-red-100    text-red-700'     }
+  if (score <= 2) return { label: 'Light',    color: 'bg-emerald-50 text-emerald-700' }
+  if (score <= 5) return { label: 'Moderate', color: 'bg-amber-50  text-amber-700'   }
+  return              { label: 'Heavy',    color: 'bg-red-50    text-red-600'     }
 }
 
 function toMonthKey(d: Date) {
@@ -48,10 +49,10 @@ function buildMonthOptions() {
 
 function KPICard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color: string }) {
   return (
-    <div className="rounded-2xl bg-white border border-slate-100 shadow-sm px-5 py-4">
-      <p className="text-xs font-medium text-slate-500 mb-1">{label}</p>
+    <div className="rounded-xl bg-card border border-border shadow-card px-5 py-4">
+      <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
       <p className={cn('text-2xl font-bold tabular-nums', color)}>{value}</p>
-      {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
     </div>
   )
 }
@@ -63,10 +64,10 @@ type HeadSortKey = 'dept' | 'role' | 'planned' | 'actual' | 'gap' | 'fill'
 type WorkSortKey = 'name' | 'role' | 'jds' | 'tasks' | 'score'
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
-  if (!active) return <ChevronsUpDown size={12} className="text-slate-300 ml-1 inline shrink-0" />
+  if (!active) return <ChevronsUpDown size={12} className="text-muted-foreground/60 ml-1 inline shrink-0" />
   return dir === 'asc'
-    ? <ChevronUp size={12} className="text-blue-500 ml-1 inline shrink-0" />
-    : <ChevronDown size={12} className="text-blue-500 ml-1 inline shrink-0" />
+    ? <ChevronUp size={12} className="text-primary ml-1 inline shrink-0" />
+    : <ChevronDown size={12} className="text-primary ml-1 inline shrink-0" />
 }
 
 // ─── Inline editable planned cell ─────────────────────────────────────────────
@@ -91,7 +92,7 @@ function PlannedCell({
         onChange={(e) => setInput(e.target.value)}
         onBlur={() => { onSave(parseInt(input) || 0); setEditing(false) }}
         onKeyDown={(e) => { if (e.key === 'Enter') { onSave(parseInt(input) || 0); setEditing(false) } if (e.key === 'Escape') setEditing(false) }}
-        className="w-16 rounded border border-blue-400 bg-blue-50 px-1.5 py-0.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        className="w-16 rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
       />
     )
   }
@@ -99,10 +100,10 @@ function PlannedCell({
   return (
     <button
       onClick={() => setEditing(true)}
-      className="tabular-nums rounded px-1.5 py-0.5 text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors cursor-pointer"
+      className="tabular-nums rounded px-1.5 py-0.5 text-foreground hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
       title="Click to edit planned headcount"
     >
-      {value > 0 ? value : <span className="text-slate-300 italic text-[11px]">Set target</span>}
+      {value > 0 ? value : <span className="text-muted-foreground/60 italic text-[11px]">Set target</span>}
     </button>
   )
 }
@@ -255,49 +256,49 @@ export function CapacityPlanning() {
       {/* ── Header ── */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Capacity Planning</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Headcount targets and workload distribution by branch</p>
+          <h1 className="text-2xl font-bold text-foreground">Capacity Planning</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Headcount targets and workload distribution by branch</p>
         </div>
 
         {/* Controls */}
         <div className="flex flex-wrap items-center gap-2">
           {availableBranches.length > 1 && (
-            <select
+            <NativeSelect
               value={selectedBranch}
               onChange={(e) => setSelectedBranch(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm text-slate-700 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
+              className="rounded-lg border border-border bg-card py-2 pl-3 pr-8 text-sm text-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
             >
               {availableBranches.map((b) => (
                 <option key={b} value={b}>{b}</option>
               ))}
-            </select>
+            </NativeSelect>
           )}
           {availableBranches.length === 1 && selectedBranch && (
-            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">{selectedBranch}</span>
+            <span className="rounded-lg border border-border bg-muted px-3 py-2 text-sm font-semibold text-foreground">{selectedBranch}</span>
           )}
-          <select
+          <NativeSelect
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm text-slate-700 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
+            className="rounded-lg border border-border bg-card py-2 pl-3 pr-8 text-sm text-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
           >
             {monthOptions.map((m) => (
               <option key={m} value={m}>{monthLabel(m)}{m === currentMonthKey ? ' (Current)' : ''}</option>
             ))}
-          </select>
+          </NativeSelect>
         </div>
       </div>
 
       {/* ── KPI Strip ── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <KPICard label="Planned Headcount" value={totalPlanned > 0 ? totalPlanned : '—'} color="text-blue-600" sub={totalPlanned === 0 ? 'No targets set' : undefined} />
-        <KPICard label="Actual Headcount"  value={totalActual} color="text-slate-800" />
+        <KPICard label="Planned Headcount" value={totalPlanned > 0 ? totalPlanned : '—'} color="text-primary" sub={totalPlanned === 0 ? 'No targets set' : undefined} />
+        <KPICard label="Actual Headcount"  value={totalActual} color="text-foreground" />
         <KPICard label="Open Gaps"         value={totalGap}    color={totalGap > 0 ? 'text-red-600' : 'text-emerald-600'} sub={totalPlanned > 0 && totalGap === 0 ? 'Fully staffed' : undefined} />
         <KPICard label="Avg Workload"      value={avgBand.label} color={avgBand.label === 'Light' ? 'text-emerald-600' : avgBand.label === 'Moderate' ? 'text-amber-600' : 'text-red-600'} sub={`${avgScore.toFixed(1)} tasks/person avg`} />
       </div>
 
       {/* ── Tabs ── */}
-      <div className="rounded-2xl bg-white border border-slate-100 shadow-sm">
-        <div className="flex border-b border-slate-100 px-4 pt-3 pb-0 gap-1">
+      <div className="rounded-xl bg-card border border-border shadow-card">
+        <div className="flex border-b border-border px-4 pt-3 pb-0 gap-1 overflow-x-auto">
           {([
             { key: 'dashboard' as TabKey, label: 'Overview & Analytics', icon: <LayoutDashboard size={14} /> },
             { key: 'headcount' as TabKey, label: 'Headcount Targets', icon: <Users size={14} /> },
@@ -307,8 +308,8 @@ export function CapacityPlanning() {
               key={key}
               onClick={() => setTab(key)}
               className={cn(
-                'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px',
-                tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+                'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px whitespace-nowrap',
+                tab === key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
               )}
             >
               {icon}{label}
@@ -326,18 +327,18 @@ export function CapacityPlanning() {
         {/* ── Headcount Tab ── */}
         {tab === 'headcount' && (
           headcountRows.length === 0 ? (
-            <div className="px-6 py-12 text-center text-sm text-slate-400">
-              No employees found in branch <span className="font-semibold text-slate-600">{selectedBranch}</span>.
+            <div className="px-6 py-12 text-center text-sm text-muted-foreground">
+              No employees found in branch <span className="font-semibold text-foreground">{selectedBranch}</span>.
             </div>
           ) : (
             <>
               {canEdit && (
-                <p className="px-5 pt-3 text-[11px] text-slate-400 italic">Click a Planned value to set your headcount target for {monthLabel(selectedMonth)}.</p>
+                <p className="px-5 pt-3 text-[11px] text-muted-foreground italic">Click a Planned value to set your headcount target for {monthLabel(selectedMonth)}.</p>
               )}
               <div className="overflow-x-auto">
                 <table className="min-w-full">
                   <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50/50">
+                    <tr className="border-b border-border bg-muted/50">
                       {([
                         { key: 'dept' as HeadSortKey, label: 'Department', align: 'text-left' },
                         { key: 'role' as HeadSortKey, label: 'Role', align: 'text-left' },
@@ -346,8 +347,8 @@ export function CapacityPlanning() {
                         { key: 'gap' as HeadSortKey, label: 'Gap', align: 'text-right justify-end', cls: 'w-28' },
                         { key: 'fill' as HeadSortKey, label: 'Fill %', align: 'text-right justify-end', cls: 'w-28' },
                       ]).map(({ key, label, align, cls }) => (
-                        <th key={key} className={`py-3 px-5 ${align.split(' ')[0]} text-xs font-semibold uppercase tracking-wider text-slate-400 ${cls ?? ''}`}>
-                          <button onClick={() => toggleHeadSort(key)} className={`flex items-center hover:text-blue-600 transition-colors ${align.includes('justify-end') ? 'justify-end w-full' : ''}`}>
+                        <th key={key} className={`py-3 px-5 ${align.split(' ')[0]} text-xs font-semibold uppercase tracking-wider text-muted-foreground ${cls ?? ''}`}>
+                          <button onClick={() => toggleHeadSort(key)} className={`flex items-center hover:text-primary transition-colors ${align.includes('justify-end') ? 'justify-end w-full' : ''}`}>
                             {label}<SortIcon active={headSortKey === key} dir={headSortDir} />
                           </button>
                         </th>
@@ -364,9 +365,9 @@ export function CapacityPlanning() {
                       const canEditRow = isAdmin || (isDirector && user?.branch === selectedBranch)
 
                       return (
-                        <tr key={rowKey} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/40 transition-colors">
-                          <td className="py-3.5 px-5 text-sm text-slate-700 font-medium">{row.deptName}</td>
-                          <td className="py-3.5 px-5 text-sm text-slate-600">{ROLE_LABELS[row.role] ?? row.role}</td>
+                        <tr key={rowKey} className="border-b border-border last:border-0 hover:bg-muted/40 transition-colors">
+                          <td className="py-3.5 px-5 text-sm text-foreground font-medium">{row.deptName}</td>
+                          <td className="py-3.5 px-5 text-sm text-muted-foreground">{ROLE_LABELS[row.role] ?? row.role}</td>
                           <td className="py-3.5 px-5 text-sm text-right">
                             <PlannedCell
                               value={planned}
@@ -374,29 +375,29 @@ export function CapacityPlanning() {
                               onSave={(v) => upsertPlan(selectedBranch, row.departmentId, row.role, v, selectedMonth)}
                             />
                           </td>
-                          <td className="py-3.5 px-5 text-sm text-right tabular-nums font-semibold text-slate-800">{row.actual}</td>
+                          <td className="py-3.5 px-5 text-sm text-right tabular-nums font-semibold text-foreground">{row.actual}</td>
                           <td className="py-3.5 px-5 text-sm text-right tabular-nums">
                             {planned > 0 ? (
-                              <span className={cn('font-semibold', gap > 0 ? 'text-red-600' : gap < 0 ? 'text-emerald-600' : 'text-slate-400')}>
+                              <span className={cn('font-semibold', gap > 0 ? 'text-red-600' : gap < 0 ? 'text-emerald-600' : 'text-muted-foreground')}>
                                 {gap > 0 ? `+${gap}` : gap}
                               </span>
                             ) : (
-                              <span className="text-slate-300">—</span>
+                              <span className="text-muted-foreground/60">—</span>
                             )}
                           </td>
                           <td className="py-3.5 px-5 text-right">
                             {fillPct !== null ? (
                               <div className="flex items-center justify-end gap-2">
-                                <div className="w-16 h-1.5 rounded-full bg-slate-100">
+                                <div className="w-16 h-1.5 rounded-full bg-muted">
                                   <div
-                                    className={cn('h-full rounded-full', fillPct >= 100 ? 'bg-emerald-500' : fillPct >= 70 ? 'bg-blue-500' : 'bg-amber-400')}
+                                    className={cn('h-full rounded-full', fillPct >= 100 ? 'bg-emerald-500' : fillPct >= 70 ? 'bg-primary' : 'bg-amber-400')}
                                     style={{ width: `${Math.min(100, fillPct)}%` }}
                                   />
                                 </div>
-                                <span className="text-xs tabular-nums font-semibold text-slate-600 w-9 text-right shrink-0">{fillPct}%</span>
+                                <span className="text-xs tabular-nums font-semibold text-muted-foreground w-9 text-right shrink-0">{fillPct}%</span>
                               </div>
                             ) : (
-                              <span className="text-slate-300 text-xs">—</span>
+                              <span className="text-muted-foreground/60 text-xs">—</span>
                             )}
                           </td>
                         </tr>
@@ -404,23 +405,23 @@ export function CapacityPlanning() {
                     })}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t-2 border-slate-100 bg-slate-50/60">
-                      <td colSpan={2} className="py-3 px-5 text-xs font-bold uppercase tracking-wider text-slate-500">Total</td>
-                      <td className="py-3 px-5 text-sm text-right tabular-nums font-bold text-slate-700">{totalPlanned > 0 ? totalPlanned : '—'}</td>
-                      <td className="py-3 px-5 text-sm text-right tabular-nums font-bold text-slate-800">{totalActual}</td>
+                    <tr className="border-t-2 border-border bg-muted/60">
+                      <td colSpan={2} className="py-3 px-5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Total</td>
+                      <td className="py-3 px-5 text-sm text-right tabular-nums font-bold text-foreground">{totalPlanned > 0 ? totalPlanned : '—'}</td>
+                      <td className="py-3 px-5 text-sm text-right tabular-nums font-bold text-foreground">{totalActual}</td>
                       <td className="py-3 px-5 text-sm text-right tabular-nums">
                         {totalPlanned > 0 ? (
                           <span className={cn('font-bold', totalGap > 0 ? 'text-red-600' : 'text-emerald-600')}>
                             {totalPlanned - totalActual > 0 ? `+${totalPlanned - totalActual}` : totalPlanned - totalActual}
                           </span>
-                        ) : <span className="text-slate-300">—</span>}
+                        ) : <span className="text-muted-foreground/60">—</span>}
                       </td>
                       <td className="py-3 px-5 text-right">
                         {totalPlanned > 0 ? (
                           <span className={cn('text-sm font-bold tabular-nums', totalActual >= totalPlanned ? 'text-emerald-600' : 'text-amber-600')}>
                             {Math.round((totalActual / totalPlanned) * 100)}%
                           </span>
-                        ) : <span className="text-slate-300 text-xs">—</span>}
+                        ) : <span className="text-muted-foreground/60 text-xs">—</span>}
                       </td>
                     </tr>
                   </tfoot>
@@ -433,14 +434,14 @@ export function CapacityPlanning() {
         {/* ── Workload Tab ── */}
         {tab === 'workload' && (
           workloadRows.length === 0 ? (
-            <div className="px-6 py-12 text-center text-sm text-slate-400">
-              No employees found in branch <span className="font-semibold text-slate-600">{selectedBranch}</span>.
+            <div className="px-6 py-12 text-center text-sm text-muted-foreground">
+              No employees found in branch <span className="font-semibold text-foreground">{selectedBranch}</span>.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full">
                 <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/50">
+                  <tr className="border-b border-border bg-muted/50">
                     {([
                       { key: 'name' as WorkSortKey, label: 'Employee', align: 'text-left justify-start', cls: '' },
                       { key: 'role' as WorkSortKey, label: 'Role', align: 'text-left justify-start', cls: '' },
@@ -448,8 +449,8 @@ export function CapacityPlanning() {
                       { key: 'tasks' as WorkSortKey, label: 'Active Tasks', align: 'text-center justify-center', cls: 'w-32' },
                       { key: 'score' as WorkSortKey, label: 'Workload', align: 'text-left justify-start', cls: 'w-36' },
                     ]).map(({ key, label, align, cls }) => (
-                      <th key={key} className={`py-3 px-5 ${align.split(' ')[0]} text-xs font-semibold uppercase tracking-wider text-slate-400 ${cls}`}>
-                        <button onClick={() => toggleWorkSort(key)} className={`flex items-center hover:text-blue-600 transition-colors ${align.split(' ')[1]} w-full`}>
+                      <th key={key} className={`py-3 px-5 ${align.split(' ')[0]} text-xs font-semibold uppercase tracking-wider text-muted-foreground ${cls}`}>
+                        <button onClick={() => toggleWorkSort(key)} className={`flex items-center hover:text-primary transition-colors ${align.split(' ')[1]} w-full`}>
                           {label}<SortIcon active={workSortKey === key} dir={workSortDir} />
                         </button>
                       </th>
@@ -461,19 +462,19 @@ export function CapacityPlanning() {
                     const band = WORKLOAD_BAND(score)
                     const dept = departments.find((d) => d.id === profile.department_id)
                     return (
-                      <tr key={profile.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/40 transition-colors">
+                      <tr key={profile.id} className="border-b border-border last:border-0 hover:bg-muted/40 transition-colors">
                         <td className="py-3.5 px-5">
-                          <p className="text-sm font-medium text-slate-800 leading-snug">{profile.full_name}</p>
-                          {dept && <p className="text-xs text-slate-400">{dept.name}</p>}
+                          <p className="text-sm font-medium text-foreground leading-snug">{profile.full_name}</p>
+                          {dept && <p className="text-xs text-muted-foreground">{dept.name}</p>}
                         </td>
-                        <td className="py-3.5 px-5 text-sm text-slate-600">{ROLE_LABELS[profile.role ?? ''] ?? profile.role}</td>
+                        <td className="py-3.5 px-5 text-sm text-muted-foreground">{ROLE_LABELS[profile.role ?? ''] ?? profile.role}</td>
                         <td className="py-3.5 px-5 text-center">
-                          <span className={cn('inline-block min-w-[1.5rem] rounded-full px-2 py-0.5 text-xs font-bold tabular-nums', activeJDs > 0 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400')}>
+                          <span className={cn('inline-block min-w-[1.5rem] rounded-full px-2 py-0.5 text-xs font-bold tabular-nums', activeJDs > 0 ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
                             {activeJDs}
                           </span>
                         </td>
                         <td className="py-3.5 px-5 text-center">
-                          <span className={cn('inline-block min-w-[1.5rem] rounded-full px-2 py-0.5 text-xs font-bold tabular-nums', activeTasks > 0 ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-400')}>
+                          <span className={cn('inline-block min-w-[1.5rem] rounded-full px-2 py-0.5 text-xs font-bold tabular-nums', activeTasks > 0 ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
                             {activeTasks}
                           </span>
                         </td>
@@ -482,7 +483,7 @@ export function CapacityPlanning() {
                             <span className={cn('rounded-full px-2.5 py-0.5 text-[11px] font-semibold', band.color)}>
                               {band.label}
                             </span>
-                            <span className="text-xs text-slate-400 tabular-nums">{score} total</span>
+                            <span className="text-xs text-muted-foreground tabular-nums">{score} total</span>
                           </div>
                         </td>
                       </tr>

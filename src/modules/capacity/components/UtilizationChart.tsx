@@ -47,28 +47,28 @@ export function UtilizationChart({ data }: UtilizationChartProps) {
               <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
           <XAxis 
             dataKey="date" 
             tickLine={false} 
             axisLine={false}
-            tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
           />
           <YAxis 
             tickLine={false} 
             axisLine={false}
-            tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
           />
           <Tooltip 
             contentStyle={{ 
-              backgroundColor: '#ffffff', 
-              border: '1px solid #e2e8f0', 
+              backgroundColor: 'hsl(var(--card))', 
+              border: '1px solid hsl(var(--border))', 
               borderRadius: '12px',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
               fontSize: '12px',
-              fontFamily: 'Inter, sans-serif'
+              fontFamily: 'Inter, sans-serif',
+              color: 'hsl(var(--foreground))'
             }}
-            labelStyle={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '4px' }}
+            labelStyle={{ fontWeight: 'bold', color: 'hsl(var(--foreground))', marginBottom: '4px' }}
           />
           <Legend 
             verticalAlign="top" 
@@ -78,7 +78,7 @@ export function UtilizationChart({ data }: UtilizationChartProps) {
             wrapperStyle={{ 
               fontSize: '11px', 
               fontWeight: 600, 
-              color: '#475569',
+              color: 'hsl(var(--muted-foreground))',
               paddingLeft: '10px'
             }} 
           />

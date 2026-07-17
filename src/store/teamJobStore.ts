@@ -22,7 +22,10 @@ interface TeamJobStore {
   fetchJobs: () => Promise<void>
   createJob: (job: NewJobPayload, tasks: NewSubTaskPayload[]) => Promise<string | null>
   addSubTask: (jobId: string, task: NewSubTaskPayload) => Promise<void>
-  updateSubTask: (taskId: string, updates: { status?: TeamTaskStatus; notes?: string }) => Promise<void>
+  updateSubTask: (
+    taskId: string,
+    updates: Partial<Pick<TeamJobTask, 'status' | 'notes' | 'title' | 'task_type' | 'due_date'>>,
+  ) => Promise<void>
   deleteSubTask: (taskId: string, jobId: string) => Promise<void>
   updateJobStatus: (jobId: string, status: TeamJobStatus) => Promise<void>
   deleteJob: (jobId: string) => Promise<void>

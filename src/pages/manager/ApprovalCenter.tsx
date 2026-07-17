@@ -4,8 +4,11 @@ import { useSpecialTaskStore } from '@/store/specialTaskStore'
 import { useAuth } from '@/contexts/AuthContext'
 import { useProfileStore } from '@/store/profileStore'
 import { usePermissionStore } from '@/store/permissionStore'
+import { useReportingStore } from '@/store/reportingStore'
 import { Card, CardTitle } from '@/components/ui/Card'
+import { PageHeader } from '@/components/shared/PageHeader'
 import { Avatar } from '@/components/ui/Avatar'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 import { cn } from '@/lib/utils'
 import {
   Compass, CheckCircle2, XCircle, MessageSquare,
@@ -69,7 +72,10 @@ export function ApprovalCenter() {
   }
 
   // ── Task Approvals ───────────────────────────────────────────────────────────
-  const reporteeIds = new Set(profiles.filter((p) => p.manager_id === user.id).map((p) => p.id))
+  const reportingRecords = useReportingStore((s) => s.reportingRecords)
+  const reporteeIds = new Set(
+    reportingRecords.filter((r) => r.reporting_to_id === user?.id).map((r) => r.employee_id)
+  )
 
   // Detail changes pending approval (by supervisor or MD/EA)
   const pendingTaskChanges = tasks.filter((t) => {
@@ -113,35 +119,35 @@ export function ApprovalCenter() {
   return (
     <div className="space-y-6 animate-fade-in pb-10 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Approval Center</h1>
-          <p className="text-sm text-slate-500">Review and action submissions from your team</p>
-        </div>
-        <button
-          onClick={() => setShowHistory(!showHistory)}
-          className="text-xs font-semibold text-brand-600 hover:text-brand-700 bg-white border border-slate-200 rounded-lg px-3.5 py-2 shadow-sm transition-colors self-start sm:self-auto"
-        >
-          {showHistory ? 'View Pending' : 'View History'}
-        </button>
-      </div>
+      <PageHeader
+        title="Approvals"
+        description="Review and action submissions from your team"
+        actions={
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="text-xs font-semibold text-primary hover:text-primary/90 bg-card border border-border rounded-lg px-3.5 py-2 shadow-card transition-colors"
+          >
+            {showHistory ? 'View Pending' : 'View History'}
+          </button>
+        }
+      />
 
       {/* Tab switcher */}
-      <div className="flex gap-1 border-b border-slate-200">
+      <div className="flex gap-1 border-b border-border">
         {hasJDAccess && (
           <button
             onClick={() => setActiveTab('jd')}
             className={cn(
               'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px',
               activeTab === 'jd'
-                ? 'border-blue-600 text-blue-700'
-                : 'border-transparent text-slate-500 hover:text-slate-700',
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
             <Compass size={14} />
             Job Directions
             {pendingJDs.length > 0 && (
-              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+              <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
                 {pendingJDs.length}
               </span>
             )}
@@ -153,14 +159,14 @@ export function ApprovalCenter() {
             className={cn(
               'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px',
               activeTab === 'tasks'
-                ? 'border-blue-600 text-blue-700'
-                : 'border-transparent text-slate-500 hover:text-slate-700',
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
             <CheckSquare size={14} />
             Tasks
             {pendingTaskApprovals.length + pendingTaskChanges.length > 0 && (
-              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+              <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
                 {pendingTaskApprovals.length + pendingTaskChanges.length}
               </span>
             )}
@@ -173,13 +179,13 @@ export function ApprovalCenter() {
               'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px',
               activeTab === 'deletions'
                 ? 'border-red-600 text-red-700'
-                : 'border-transparent text-slate-500 hover:text-slate-700',
+                : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
             <Trash2 size={14} />
             Deletion Requests
             {pendingDeletions.length > 0 && (
-              <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+              <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
                 {pendingDeletions.length}
               </span>
             )}
@@ -191,12 +197,12 @@ export function ApprovalCenter() {
       {activeTab === 'jd' && hasJDAccess && (
         showHistory ? (
           <Card padding={false}>
-            <div className="border-b border-slate-100 p-4">
+            <div className="border-b border-border p-4">
               <CardTitle>JD Approval History</CardTitle>
             </div>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-border">
               {historyJDs.length === 0 ? (
-                <div className="py-12 text-center text-sm text-slate-400">No review history found.</div>
+                <div className="py-12 text-center text-sm text-muted-foreground">No review history found.</div>
               ) : historyJDs.map((jd) => {
                 const emp = profiles.find((p) => p.id === jd.employee_id)
                 return (
@@ -205,13 +211,13 @@ export function ApprovalCenter() {
                       <div className="flex items-center gap-3">
                         <Avatar name={emp?.full_name ?? '?'} size="sm" />
                         <div>
-                          <p className="text-sm font-semibold text-slate-800">{emp?.full_name}</p>
-                          <p className="text-[10px] text-slate-400 capitalize">{emp?.role?.replace('_', ' ')}</p>
+                          <p className="text-sm font-semibold text-foreground">{emp?.full_name}</p>
+                          <p className="text-[10px] text-muted-foreground capitalize">{emp?.role?.replace('_', ' ')}</p>
                         </div>
                       </div>
                       <span className={cn(
                         'rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider',
-                        ['active', 'completed', 'approved'].includes(jd.status) ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                        ['active', 'completed', 'approved'].includes(jd.status) ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
                       )}>
                         {['active', 'completed', 'approved'].includes(jd.status) ? 'Approved' : jd.status}
                       </span>
@@ -248,13 +254,13 @@ export function ApprovalCenter() {
                     <div className="flex gap-2 justify-end">
                       <button
                         onClick={() => { setActiveJdId(jd.id); setActiveJdAction('reject'); setJdNotes('') }}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-card px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
                       >
                         <X size={14} /> Request Changes
                       </button>
                       <button
                         onClick={() => { setActiveJdId(jd.id); setActiveJdAction('approve'); setJdNotes('') }}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors shadow-card"
                       >
                         <Check size={14} /> Approve
                       </button>
@@ -271,12 +277,12 @@ export function ApprovalCenter() {
       {activeTab === 'tasks' && hasTaskAccess && (
         showHistory ? (
           <Card padding={false}>
-            <div className="border-b border-slate-100 p-4">
+            <div className="border-b border-border p-4">
               <CardTitle>Task Completion History</CardTitle>
             </div>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-border">
               {historyTaskApprovals.length === 0 ? (
-                <div className="py-12 text-center text-sm text-slate-400">No task completion history found.</div>
+                <div className="py-12 text-center text-sm text-muted-foreground">No task completion history found.</div>
               ) : historyTaskApprovals.map((task) => {
                 const assigneeProfiles = (task.assignees ?? []).map((a) => profiles.find((p) => p.id === a.employee_id)).filter(Boolean)
                 return (
@@ -287,13 +293,13 @@ export function ApprovalCenter() {
                           <div key={p.id} className="flex items-center gap-2">
                             <Avatar name={p.full_name} size="sm" />
                             <div>
-                              <p className="text-sm font-semibold text-slate-800">{p.full_name}</p>
-                              <p className="text-[10px] text-slate-400 capitalize">{p.role?.replace('_', ' ')}</p>
+                              <p className="text-sm font-semibold text-foreground">{p.full_name}</p>
+                              <p className="text-[10px] text-muted-foreground capitalize">{p.role?.replace('_', ' ')}</p>
                             </div>
                           </div>
                         ))}
                       </div>
-                      <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
                         Completed
                       </span>
                     </div>
@@ -313,9 +319,9 @@ export function ApprovalCenter() {
 
             {/* Section 1: Task Details Changes Awaiting Approval */}
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-slate-700">Task Details & New Tasks Awaiting Approval</h3>
+              <h3 className="text-sm font-semibold text-foreground">Task Details & New Tasks Awaiting Approval</h3>
               {pendingTaskChanges.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-200 py-6 text-center text-xs text-slate-400">
+                <div className="rounded-xl border border-dashed border-border py-6 text-center text-xs text-muted-foreground">
                   No task detail changes pending approval.
                 </div>
               ) : (
@@ -333,13 +339,13 @@ export function ApprovalCenter() {
                             <div key={p.id} className="flex items-center gap-2">
                               <Avatar name={p.full_name} size="sm" />
                               <div>
-                                <p className="text-sm font-semibold text-slate-800">{p.full_name}</p>
-                                <p className="text-[10px] text-slate-400 capitalize">{p.role?.replace('_', ' ')}</p>
+                                <p className="text-sm font-semibold text-foreground">{p.full_name}</p>
+                                <p className="text-[10px] text-muted-foreground capitalize">{p.role?.replace('_', ' ')}</p>
                               </div>
                             </div>
                           ))}
                         </div>
-                        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 shrink-0">
+                        <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 shrink-0">
                           Pending Details Approval
                         </span>
                       </div>
@@ -360,13 +366,13 @@ export function ApprovalCenter() {
                         <div className="flex gap-2 justify-end">
                           <button
                             onClick={() => { setActiveTaskId(task.id); setActiveTaskAction('reject_change'); setTaskNotes('') }}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-card px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
                           >
                             <XCircle size={14} /> Request Changes
                           </button>
                           <button
                             onClick={() => { setActiveTaskId(task.id); setActiveTaskAction('approve_change'); setTaskNotes('') }}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors shadow-card"
                           >
                             <CheckCircle2 size={14} /> Approve Details
                           </button>
@@ -380,9 +386,9 @@ export function ApprovalCenter() {
 
             {/* Section 2: Tasks Awaiting Review & Completion */}
             <div className="space-y-3 pt-2">
-              <h3 className="text-sm font-semibold text-slate-700">Tasks Awaiting Review & Completion</h3>
+              <h3 className="text-sm font-semibold text-foreground">Tasks Awaiting Review & Completion</h3>
               {pendingTaskApprovals.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-200 py-6 text-center text-xs text-slate-400">
+                <div className="rounded-xl border border-dashed border-border py-6 text-center text-xs text-muted-foreground">
                   No tasks pending review.
                 </div>
               ) : (
@@ -401,15 +407,13 @@ export function ApprovalCenter() {
                             <div key={p.id} className="flex items-center gap-2">
                               <Avatar name={p.full_name} size="sm" />
                               <div>
-                                <p className="text-sm font-semibold text-slate-800">{p.full_name}</p>
-                                <p className="text-[10px] text-slate-400 capitalize">{p.role?.replace('_', ' ')}</p>
+                                <p className="text-sm font-semibold text-foreground">{p.full_name}</p>
+                                <p className="text-[10px] text-muted-foreground capitalize">{p.role?.replace('_', ' ')}</p>
                               </div>
                             </div>
                           ))}
                         </div>
-                        <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-700 shrink-0">
-                          In Review
-                        </span>
+                        <StatusBadge status="In review" className="text-[10px] px-2.5 shrink-0" />
                       </div>
 
                       <TaskDetailBlock task={task} assigner={assigner} />
@@ -428,13 +432,13 @@ export function ApprovalCenter() {
                         <div className="flex gap-2 justify-end">
                           <button
                             onClick={() => { setActiveTaskId(task.id); setActiveTaskAction('revise'); setTaskNotes('') }}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-card px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
                           >
                             <XCircle size={14} /> Request Revision
                           </button>
                           <button
                             onClick={() => { setActiveTaskId(task.id); setActiveTaskAction('acknowledge'); setTaskNotes('') }}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors shadow-card"
                           >
                             <CheckCircle2 size={14} /> Acknowledge
                           </button>
@@ -460,7 +464,7 @@ export function ApprovalCenter() {
               <Card key={jd.id} className="p-5 space-y-4">
                 <div className="flex items-center justify-between gap-3">
                   <EmployeeHeader profile={emp} />
-                  <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-700 shrink-0">
+                  <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-600 shrink-0">
                     Deletion Pending
                   </span>
                 </div>
@@ -471,13 +475,13 @@ export function ApprovalCenter() {
                 <div className="flex gap-2 justify-end">
                   <button
                     onClick={() => rejectDeletion(jd.id)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
                   >
                     <X size={14} /> Keep Active
                   </button>
                   <button
                     onClick={() => approveDeletion(jd.id)}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 transition-colors shadow-sm"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 transition-colors shadow-card"
                   >
                     <Trash2 size={14} /> Approve Deletion
                   </button>
@@ -507,8 +511,8 @@ function EmployeeHeader({ profile }: { profile: ReturnType<typeof useProfileStor
     <div className="flex items-center gap-3">
       <Avatar name={profile.full_name} size="sm" />
       <div>
-        <p className="text-sm font-semibold text-slate-800">{profile.full_name}</p>
-        <p className="text-[10px] text-slate-400 capitalize">{profile.role?.replace('_', ' ')}</p>
+        <p className="text-sm font-semibold text-foreground">{profile.full_name}</p>
+        <p className="text-[10px] text-muted-foreground capitalize">{profile.role?.replace('_', ' ')}</p>
       </div>
     </div>
   )
@@ -516,12 +520,12 @@ function EmployeeHeader({ profile }: { profile: ReturnType<typeof useProfileStor
 
 function JDDetailBlock({ jd }: { jd: JobDirection }) {
   return (
-    <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 space-y-2">
-      <p className="text-sm text-slate-800 font-medium leading-relaxed">{jd.work_details}</p>
-      <div className="flex gap-4 text-xs text-slate-500 font-semibold">
-        {jd.daily_target > 0   && <span>Daily: <strong className="text-slate-700">{jd.daily_target}</strong></span>}
-        {jd.weekly_target > 0  && <span>Weekly: <strong className="text-slate-700">{jd.weekly_target}</strong></span>}
-        {jd.monthly_target > 0 && <span>Monthly: <strong className="text-slate-700">{jd.monthly_target}</strong></span>}
+    <div className="bg-muted/50 rounded-xl p-4 border border-border space-y-2">
+      <p className="text-sm text-foreground font-medium leading-relaxed">{jd.work_details}</p>
+      <div className="flex gap-4 text-xs text-muted-foreground font-semibold">
+        {jd.daily_target > 0   && <span>Daily: <strong className="text-foreground">{jd.daily_target}</strong></span>}
+        {jd.weekly_target > 0  && <span>Weekly: <strong className="text-foreground">{jd.weekly_target}</strong></span>}
+        {jd.monthly_target > 0 && <span>Monthly: <strong className="text-foreground">{jd.monthly_target}</strong></span>}
       </div>
     </div>
   )
@@ -535,43 +539,43 @@ function TaskDetailBlock({
 }) {
   const proposed = task.pending_changes
   return (
-    <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 space-y-2">
+    <div className="bg-muted/50 rounded-xl p-4 border border-border space-y-2">
       {/* Task name */}
       {proposed?.task_name !== undefined && proposed.task_name !== task.task_name ? (
         <div className="space-y-0.5">
-          <p className="text-xs text-slate-400 line-through">{task.task_name}</p>
-          <p className="text-sm text-slate-800 font-medium leading-relaxed">{proposed.task_name}</p>
+          <p className="text-xs text-muted-foreground line-through">{task.task_name}</p>
+          <p className="text-sm text-foreground font-medium leading-relaxed">{proposed.task_name}</p>
         </div>
       ) : (
-        <p className="text-sm text-slate-800 font-medium leading-relaxed">{task.task_name}</p>
+        <p className="text-sm text-foreground font-medium leading-relaxed">{task.task_name}</p>
       )}
 
-      <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+      <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
         {assigner && (
           <span className="flex items-center gap-1">
-            <Clock size={11} /> Assigned by <strong className="text-slate-700">{assigner.full_name}</strong>
+            <Clock size={11} /> Assigned by <strong className="text-foreground">{assigner.full_name}</strong>
           </span>
         )}
         {/* Due date: show before → after when changed */}
         {proposed && 'due_date' in proposed ? (
           <span className="flex items-center gap-1.5">
-            <span className="line-through text-slate-400">{task.due_date ?? 'No due date'}</span>
+            <span className="line-through text-muted-foreground">{task.due_date ?? 'No due date'}</span>
             <span>→</span>
-            <strong className="text-slate-700">{proposed.due_date ?? 'No due date'}</strong>
+            <strong className="text-foreground">{proposed.due_date ?? 'No due date'}</strong>
           </span>
         ) : task.due_date ? (
-          <span>Due <strong className="text-slate-700">{task.due_date}</strong></span>
+          <span>Due <strong className="text-foreground">{task.due_date}</strong></span>
         ) : null}
       </div>
 
       {/* Remarks */}
       {proposed?.remarks !== undefined && proposed.remarks !== task.remarks ? (
         <div className="space-y-0.5">
-          {task.remarks && <p className="text-xs text-slate-400 line-through italic">{task.remarks}</p>}
-          {proposed.remarks && <p className="text-xs text-slate-500 italic">{proposed.remarks}</p>}
+          {task.remarks && <p className="text-xs text-muted-foreground line-through italic">{task.remarks}</p>}
+          {proposed.remarks && <p className="text-xs text-muted-foreground italic">{proposed.remarks}</p>}
         </div>
       ) : task.remarks ? (
-        <p className="text-xs text-slate-400 italic">{task.remarks}</p>
+        <p className="text-xs text-muted-foreground italic">{task.remarks}</p>
       ) : null}
 
       {proposed && (
@@ -583,8 +587,8 @@ function TaskDetailBlock({
 
 function RemarksBlock({ text }: { text: string }) {
   return (
-    <div className="flex gap-2 text-[11px] text-slate-500 bg-slate-50 px-3 py-2 rounded-lg">
-      <MessageSquare size={13} className="mt-0.5 text-slate-400" />
+    <div className="flex gap-2 text-[11px] text-muted-foreground bg-muted px-3 py-2 rounded-lg">
+      <MessageSquare size={13} className="mt-0.5 text-muted-foreground" />
       <p><strong>Remarks:</strong> {text}</p>
     </div>
   )
@@ -602,8 +606,8 @@ function ActionConfirm({
   rejectLabel?: string
 }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 space-y-3">
-      <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+    <div className="rounded-xl border border-border bg-muted/50 p-4 space-y-3">
+      <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
         {action === 'approve'
           ? <><CheckCircle2 size={14} className="text-emerald-500" /><span>Confirm {approveLabel}</span></>
           : <><XCircle size={14} className="text-red-500" /><span>{rejectLabel}</span></>
@@ -614,16 +618,16 @@ function ActionConfirm({
         onChange={(e) => onNotesChange(e.target.value)}
         placeholder="Add remarks or notes..."
         rows={3}
-        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 focus:outline-none focus:border-slate-300"
+        className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:border-primary/40"
       />
       <div className="flex gap-2 justify-end">
-        <button onClick={onCancel} className="rounded-lg border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50">
+        <button onClick={onCancel} className="rounded-lg border border-border bg-card px-3.5 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted">
           Cancel
         </button>
         <button
           onClick={onConfirm}
           className={cn(
-            'rounded-lg px-4 py-1.5 text-xs font-semibold text-white shadow-sm',
+            'rounded-lg px-4 py-1.5 text-xs font-semibold text-white shadow-card',
             action === 'approve' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
           )}
         >
@@ -636,7 +640,7 @@ function ActionConfirm({
 
 function EmptyState({ icon, message }: { icon: React.ReactNode; message: string }) {
   return (
-    <Card className="py-12 text-center text-slate-400">
+    <Card className="py-12 text-center text-muted-foreground">
       {icon}
       <p className="text-sm font-medium">{message}</p>
     </Card>

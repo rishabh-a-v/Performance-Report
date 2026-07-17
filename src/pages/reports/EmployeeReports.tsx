@@ -16,6 +16,10 @@ import { useRBACFilter } from '@/hooks/useRBACFilter'
 import { cn, formatDate, todayLocalISO } from '@/lib/utils'
 import type { JDReportRow, TaskReportRow, TeamTaskReportRow, JobDirection, SpecialTask } from '@/types/database'
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { NativeSelect } from '@/components/ui/Select'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { StatChip, StatChipRow } from '@/components/shared/StatChip'
 
 // ── Period config ─────────────────────────────────────────────────────────────
 
@@ -61,49 +65,10 @@ type TaskSortKey = 'task_name' | 'due_date' | 'completed_at' | 'status'
 type TeamTaskSortKey = 'sub_task_title' | 'job_title' | 'due_date' | 'status'
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
-  if (!active) return <ChevronsUpDown size={12} className="text-slate-300 ml-1 inline shrink-0" />
+  if (!active) return <ChevronsUpDown size={12} className="text-muted-foreground/60 ml-1 inline shrink-0" />
   return dir === 'asc'
-    ? <ChevronUp size={12} className="text-blue-500 ml-1 inline shrink-0" />
-    : <ChevronDown size={12} className="text-blue-500 ml-1 inline shrink-0" />
-}
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function StatCard({ label, value, sub, icon: Icon, color, bg }: {
-  label: string; value: string | number; sub?: string
-  icon: React.ElementType; color: string; bg: string
-}) {
-  return (
-    <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-4 sm:p-5">
-      <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-xl mb-3', bg)}>
-        <Icon size={17} className={color} />
-      </div>
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">{label}</p>
-      <p className={cn('text-3xl font-bold tabular-nums', color)}>{value}</p>
-      {sub && <p className="mt-1 text-xs text-slate-400">{sub}</p>}
-    </div>
-  )
-}
-
-const TASK_STATUS_STYLE: Record<string, string> = {
-  'Yet to start': 'bg-slate-100 text-slate-500',
-  'In progress':  'bg-blue-100 text-blue-700',
-  Completed:      'bg-emerald-100 text-emerald-700',
-  'In review':    'bg-purple-100 text-purple-700',
-}
-
-const TEAM_TASK_STATUS_STYLE: Record<string, string> = {
-  'Yet to start': 'bg-slate-100 text-slate-500',
-  'In progress':  'bg-blue-100 text-blue-700',
-  Completed:      'bg-emerald-100 text-emerald-700',
-}
-
-const JD_STATUS_STYLE: Record<string, string> = {
-  active:    'bg-blue-100 text-blue-700',
-  submitted: 'bg-amber-100 text-amber-700',
-  approved:  'bg-emerald-100 text-emerald-700',
-  completed: 'bg-teal-100 text-teal-700',
-  rejected:  'bg-red-100 text-red-600',
+    ? <ChevronUp size={12} className="text-primary ml-1 inline shrink-0" />
+    : <ChevronDown size={12} className="text-primary ml-1 inline shrink-0" />
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
@@ -231,39 +196,33 @@ export function EmployeeReports() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Employee Reports</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Performance overview across different time periods</p>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {/* Employee selector */}
-        {showEmployeeSelector ? (
-          <div className="flex items-center gap-2">
-            <User size={15} className="text-slate-400 shrink-0" />
-            <select
-              value={selectedId}
-              onChange={(e) => setSelectedId(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200 shadow-sm"
-            >
-              {allowedProfiles.map((p) => (
-                <option key={p.id} value={p.id}>{p.full_name}</option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <User size={15} className="text-slate-400 shrink-0" />
-            <span className="text-sm font-semibold text-slate-700">{selectedProfile?.full_name ?? '—'}</span>
-          </div>
-        )}
-
-        {/* Period tabs */}
-        <div className="flex border-b border-slate-200">
+      {/* Header: title + employee selector; period tabs below */}
+      <PageHeader
+        title="Reports"
+        description={periodLabel(period)}
+        actions={
+          showEmployeeSelector ? (
+            <div className="flex items-center gap-2">
+              <User size={15} className="text-muted-foreground shrink-0" />
+              <NativeSelect
+                value={selectedId}
+                onChange={(e) => setSelectedId(e.target.value)}
+                className="rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                {allowedProfiles.map((p) => (
+                  <option key={p.id} value={p.id}>{p.full_name}</option>
+                ))}
+              </NativeSelect>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <User size={15} className="text-muted-foreground shrink-0" />
+              <span className="text-sm font-semibold text-foreground">{selectedProfile?.full_name ?? '—'}</span>
+            </div>
+          )
+        }
+      >
+        <div className="flex border-b border-border overflow-x-auto">
           {PERIODS.map(({ key, label }) => (
             <button
               key={key}
@@ -271,75 +230,46 @@ export function EmployeeReports() {
               className={cn(
                 'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
                 period === key
-                  ? 'border-blue-600 text-blue-700'
-                  : 'border-transparent text-slate-500 hover:text-slate-700',
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
               )}
             >
               {label}
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Period label */}
-      <div className="flex items-center gap-2">
-        <BarChart2 size={14} className="text-slate-400" />
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{periodLabel(period)}</p>
-      </div>
+      </PageHeader>
 
       {loading ? (
-        <div className="flex items-center justify-center py-24 text-slate-400">
+        <div className="flex items-center justify-center py-24 text-muted-foreground">
           <p className="text-sm font-medium">Loading report…</p>
         </div>
       ) : (
         <>
-          {/* Summary KPI cards */}
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard
-              label="JD Target"
-              value={totalTarget.toLocaleString()}
-              sub="Sum of monthly targets"
-              icon={Target}
-              color="text-blue-600"
-              bg="bg-blue-50"
+          {/* Summary chips */}
+          <StatChipRow>
+            <StatChip label="JD Target" value={totalTarget} />
+            <StatChip
+              label={`JD Achieved (${achievePct}%)`}
+              value={totalAchieved}
+              tone={achievePct >= 100 ? 'success' : achievePct >= 50 ? 'warn' : 'danger'}
             />
-            <StatCard
-              label="JD Achieved"
-              value={totalAchieved.toLocaleString()}
-              sub={`${achievePct}% of target`}
-              icon={TrendingUp}
-              color={achievePct >= 100 ? 'text-emerald-600' : achievePct >= 50 ? 'text-amber-600' : 'text-red-500'}
-              bg={achievePct >= 100 ? 'bg-emerald-50' : achievePct >= 50 ? 'bg-amber-50' : 'bg-red-50'}
-            />
-            <StatCard
-              label="Tasks Completed"
-              value={taskCompleted}
-              sub={`of ${taskRows.length} total tasks`}
-              icon={CheckCircle2}
-              color="text-emerald-600"
-              bg="bg-emerald-50"
-            />
-            <StatCard
-              label="Tasks Overdue"
-              value={taskOverdue}
-              icon={AlertCircle}
-              color={taskOverdue > 0 ? 'text-red-500' : 'text-slate-400'}
-              bg={taskOverdue > 0 ? 'bg-red-50' : 'bg-slate-50'}
-            />
-          </div>
+            <StatChip label={`Tasks Completed (of ${taskRows.length})`} value={taskCompleted} tone="success" />
+            <StatChip label="Tasks Overdue" value={taskOverdue} tone={taskOverdue > 0 ? 'danger' : 'default'} />
+          </StatChipRow>
 
           {/* JD Breakdown */}
-          <div className="rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden">
-            <div className="border-b border-slate-100 px-5 py-4">
-              <h2 className="text-sm font-bold text-slate-800">Job Directions — Progress in Period</h2>
+          <div className="rounded-xl bg-card border border-border shadow-card overflow-hidden">
+            <div className="border-b border-border px-5 py-4">
+              <h2 className="text-sm font-bold text-foreground">Job Directions — Progress in Period</h2>
             </div>
             {jdRows.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-14 text-slate-400">
+              <div className="flex flex-col items-center justify-center py-14 text-muted-foreground">
                 <BarChart2 size={28} className="opacity-25 mb-2" />
                 <p className="text-sm font-medium">No job directions found</p>
               </div>
             ) : (
-              <div className="divide-y divide-slate-50">
+              <div className="divide-y divide-border">
                 {jdRows.map((row) => {
                   const pct = row.monthly_target > 0
                     ? Math.min(100, Math.round((row.achieved_in_period / row.monthly_target) * 100))
@@ -349,30 +279,28 @@ export function EmployeeReports() {
                     <div
                       key={row.id}
                       onClick={() => liveJD && setSelectedDetail({ kind: 'jd', data: liveJD })}
-                      className={cn('flex items-center gap-4 px-5 py-4 transition-colors', liveJD && 'cursor-pointer hover:bg-slate-50')}
+                      className={cn('flex items-center gap-4 px-5 py-4 transition-colors', liveJD && 'cursor-pointer hover:bg-muted')}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1.5">
-                          <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize', JD_STATUS_STYLE[row.status] ?? 'bg-slate-100 text-slate-500')}>
-                            {row.status}
-                          </span>
-                          <p className="text-sm font-medium text-slate-800 truncate">
+                          <StatusBadge status={row.status} />
+                          <p className="text-sm font-medium text-foreground truncate">
                             {row.work_details ?? '—'}
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
-                          <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden max-w-xs">
+                          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden max-w-xs">
                             <div
-                              className={cn('h-full rounded-full', pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-blue-500' : 'bg-amber-500')}
+                              className={cn('h-full rounded-full', pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-primary' : 'bg-amber-500')}
                               style={{ width: `${pct}%` }}
                             />
                           </div>
-                          <span className="text-xs font-bold text-slate-500 tabular-nums">{pct}%</span>
+                          <span className="text-xs font-bold text-muted-foreground tabular-nums">{pct}%</span>
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-sm font-bold text-slate-800 tabular-nums">{row.achieved_in_period.toLocaleString()}</p>
-                        <p className="text-[11px] text-slate-400">of {row.monthly_target.toLocaleString()}</p>
+                        <p className="text-sm font-bold text-foreground tabular-nums">{row.achieved_in_period.toLocaleString()}</p>
+                        <p className="text-[11px] text-muted-foreground">of {row.monthly_target.toLocaleString()}</p>
                       </div>
                     </div>
                   )
@@ -382,29 +310,29 @@ export function EmployeeReports() {
           </div>
 
           {/* Task Breakdown */}
-          <div className="rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden">
-            <div className="border-b border-slate-100 px-5 py-4">
-              <h2 className="text-sm font-bold text-slate-800">Special Tasks</h2>
+          <div className="rounded-xl bg-card border border-border shadow-card overflow-hidden">
+            <div className="border-b border-border px-5 py-4">
+              <h2 className="text-sm font-bold text-foreground">Special Tasks</h2>
             </div>
             {taskRows.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-14 text-slate-400">
+              <div className="flex flex-col items-center justify-center py-14 text-muted-foreground">
                 <CheckCircle2 size={28} className="opacity-25 mb-2" />
                 <p className="text-sm font-medium">No tasks found for this period</p>
               </div>
             ) : (
-              <div className="divide-y divide-slate-50">
+              <div className="divide-y divide-border">
                 {/* Header row */}
-                <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  <button onClick={() => toggleTaskSort('task_name')} className="flex items-center hover:text-blue-600 transition-colors">
+                <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <button onClick={() => toggleTaskSort('task_name')} className="flex items-center hover:text-primary transition-colors">
                     Task<SortIcon active={taskSortKey === 'task_name'} dir={taskSortDir} />
                   </button>
-                  <button onClick={() => toggleTaskSort('due_date')} className="flex items-center justify-end hover:text-blue-600 transition-colors">
+                  <button onClick={() => toggleTaskSort('due_date')} className="flex items-center justify-end hover:text-primary transition-colors">
                     Due Date<SortIcon active={taskSortKey === 'due_date'} dir={taskSortDir} />
                   </button>
-                  <button onClick={() => toggleTaskSort('completed_at')} className="flex items-center justify-end hover:text-blue-600 transition-colors">
+                  <button onClick={() => toggleTaskSort('completed_at')} className="flex items-center justify-end hover:text-primary transition-colors">
                     Completed<SortIcon active={taskSortKey === 'completed_at'} dir={taskSortDir} />
                   </button>
-                  <button onClick={() => toggleTaskSort('status')} className="flex items-center justify-end w-24 hover:text-blue-600 transition-colors">
+                  <button onClick={() => toggleTaskSort('status')} className="flex items-center justify-end w-24 hover:text-primary transition-colors">
                     Status<SortIcon active={taskSortKey === 'status'} dir={taskSortDir} />
                   </button>
                 </div>
@@ -415,10 +343,10 @@ export function EmployeeReports() {
                     <div
                       key={row.id}
                       onClick={() => liveTask && setSelectedDetail({ kind: 'st', data: liveTask })}
-                      className={cn('grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-2 sm:gap-4 items-center px-5 py-3.5 transition-colors', liveTask && 'cursor-pointer hover:bg-slate-50')}
+                      className={cn('grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-2 sm:gap-4 items-center px-5 py-3.5 transition-colors', liveTask && 'cursor-pointer hover:bg-muted')}
                     >
-                      <p className="text-sm font-medium text-slate-800 truncate">{row.task_name}</p>
-                      <p className={cn('text-xs font-medium text-right', isOverdue ? 'text-red-500' : 'text-slate-400')}>
+                      <p className="text-sm font-medium text-foreground truncate">{row.task_name}</p>
+                      <p className={cn('text-xs font-medium text-right', isOverdue ? 'text-red-500' : 'text-muted-foreground')}>
                         {row.due_date ? formatDate(row.due_date) : '—'}
                         {isOverdue && ' · Overdue'}
                       </p>
@@ -426,9 +354,7 @@ export function EmployeeReports() {
                         {row.completed_at ? formatDate(row.completed_at) : '—'}
                       </p>
                       <div className="flex sm:justify-end">
-                        <span className={cn('rounded-full px-2.5 py-0.5 text-[11px] font-semibold', TASK_STATUS_STYLE[row.status] ?? 'bg-slate-100 text-slate-500')}>
-                          {row.status}
-                        </span>
+                        <StatusBadge status={row.status} className="text-[11px] px-2.5" />
                       </div>
                     </div>
                   )
@@ -438,22 +364,22 @@ export function EmployeeReports() {
           </div>
 
           {/* Team Job Sub-tasks */}
-          <div className="rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden">
-            <div className="border-b border-slate-100 px-5 py-4 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-800">Team Job Sub-tasks</h2>
-              <span className="text-xs text-slate-400 font-medium">
+          <div className="rounded-xl bg-card border border-border shadow-card overflow-hidden">
+            <div className="border-b border-border px-5 py-4 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-foreground">Team Job Sub-tasks</h2>
+              <span className="text-xs text-muted-foreground font-medium">
                 {teamTaskCompleted} completed · {teamTaskOverdue} overdue
               </span>
             </div>
             {teamTaskRows.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-14 text-slate-400">
+              <div className="flex flex-col items-center justify-center py-14 text-muted-foreground">
                 <Users size={28} className="opacity-25 mb-2" />
                 <p className="text-sm font-medium">No team sub-tasks found for this period</p>
               </div>
             ) : (
-              <div className="divide-y divide-slate-50">
-                <div className="hidden sm:grid grid-cols-[1fr_160px_auto_auto] gap-4 px-5 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  <button onClick={() => toggleTeamTaskSort('sub_task_title')} className="flex items-center hover:text-blue-600 transition-colors">
+              <div className="divide-y divide-border">
+                <div className="hidden sm:grid grid-cols-[1fr_160px_auto_auto] gap-4 px-5 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <button onClick={() => toggleTeamTaskSort('sub_task_title')} className="flex items-center hover:text-primary transition-colors">
                     Sub-task<SortIcon active={teamTaskSortKey === 'sub_task_title'} dir={teamTaskSortDir} />
                   </button>
                   <button onClick={() => toggleTeamTaskSort('job_title')} className="flex items-center hover:text-blue-600 transition-colors">
@@ -477,20 +403,18 @@ export function EmployeeReports() {
                       )}
                     >
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-800 truncate">{row.sub_task_title}</p>
+                        <p className="text-sm font-medium text-foreground truncate">{row.sub_task_title}</p>
                         {row.task_type && (
-                          <span className="text-[10px] font-medium text-slate-400">{row.task_type}</span>
+                          <span className="text-[10px] font-medium text-muted-foreground">{row.task_type}</span>
                         )}
                       </div>
-                      <p className="text-xs text-slate-500 font-medium truncate">{row.job_title}</p>
-                      <p className={cn('text-xs font-medium text-right', isOverdue ? 'text-red-500' : 'text-slate-400')}>
+                      <p className="text-xs text-muted-foreground font-medium truncate">{row.job_title}</p>
+                      <p className={cn('text-xs font-medium text-right', isOverdue ? 'text-red-500' : 'text-muted-foreground')}>
                         {row.due_date ? formatDate(row.due_date) : '—'}
                         {isOverdue && ' · Overdue'}
                       </p>
                       <div className="flex sm:justify-end">
-                        <span className={cn('rounded-full px-2.5 py-0.5 text-[11px] font-semibold', TEAM_TASK_STATUS_STYLE[row.status] ?? 'bg-slate-100 text-slate-500')}>
-                          {row.status}
-                        </span>
+                        <StatusBadge status={row.status} className="text-[11px] px-2.5" />
                       </div>
                     </div>
                   )

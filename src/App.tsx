@@ -1,19 +1,22 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { ThemeProvider } from '@/contexts/ThemeContext'
+import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
 import { AppShell } from '@/components/layout/AppShell'
+import { MobileAppShell } from '@/components/layout/mobile/MobileAppShell'
 import { Login } from '@/pages/auth/Login'
-import { Overview } from '@/pages/overview/Overview'
+import { TasksPage } from '@/pages/tasks/TasksPage'
+import { MobileMore } from '@/pages/mobile/MobileMore'
+import { useIsNativeApp } from '@/hooks/useIsNativeApp'
+import { useLiveNotifications } from '@/hooks/useLiveNotifications'
 import { CalendarView } from '@/pages/employee/CalendarView'
 import { JobDirections } from '@/pages/employee/JobDirections'
-import { SpecialTasks } from '@/pages/employee/SpecialTasks'
-import { AddEmployee } from '@/pages/employee/AddEmployee'
 import { ManageEmployees } from '@/pages/employee/ManageEmployees'
 import { RolePermissions } from '@/pages/admin/RolePermissions'
 import { OrgChart } from '@/pages/admin/OrgChart'
 
 import { ApprovalCenter } from '@/pages/manager/ApprovalCenter'
-import { TeamJobs } from '@/pages/teamjobs/TeamJobs'
 import { EmployeeReports } from '@/pages/reports/EmployeeReports'
 import { CapacityPlanning } from '@/pages/capacity/CapacityPlanning'
 import type { UserRole } from '@/types/database'
@@ -31,11 +34,14 @@ const ROLE_LEVEL: Record<UserRole, number> = {
 }
 
 function Protected({ children, minRole }: { children: React.ReactNode; minRole?: UserRole }) {
-  const { isAuthenticated, role } = useAuth()
+  const { isAuthenticated, role, isLoading } = useAuth()
+  // Wait for the auth session to resolve before deciding — otherwise a hard
+  // refresh on a deep link always bounces through /login back to /tasks.
+  if (isLoading) return null
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (minRole) {
     if (!role || ROLE_LEVEL[role] < ROLE_LEVEL[minRole]) {
-      return <Navigate to="/overview" replace />
+      return <Navigate to="/tasks" replace />
     }
   }
   return <>{children}</>
@@ -43,6 +49,11 @@ function Protected({ children, minRole }: { children: React.ReactNode; minRole?:
 
 function AppRoutes() {
   const { isAuthenticated, role } = useAuth()
+  const isNativeApp = useIsNativeApp()
+  const Shell = isNativeApp ? MobileAppShell : AppShell
+
+  useLiveNotifications()
+  useNativeAppSetup()
 
   useEffect(() => {
     if (isAuthenticated && role) {
@@ -72,42 +83,42 @@ function AppRoutes() {
       <Route
         element={
           <Protected>
-            <AppShell />
+            <Shell />
           </Protected>
         }
       >
-        <Route index element={<Navigate to="/overview" replace />} />
+        <Route index element={<Navigate to="/tasks" replace />} />
 
         {/* Core */}
-        <Route path="/overview"       element={<Protected><Overview /></Protected>} />
+        <Route path="/tasks"          element={<Protected><TasksPage /></Protected>} />
         <Route path="/job-directions" element={<Protected><JobDirections /></Protected>} />
-        <Route path="/special-tasks"  element={<Protected><SpecialTasks /></Protected>} />
         <Route path="/calendar"       element={<Protected><CalendarView /></Protected>} />
+        {isNativeApp && <Route path="/more" element={<Protected><MobileMore /></Protected>} />}
 
-        {/* Team Jobs & Reports — all authenticated users */}
-        <Route path="/team-jobs" element={<Protected><TeamJobs /></Protected>} />
-        <Route path="/reports"   element={<Protected><EmployeeReports /></Protected>} />
+        {/* Reports — all authenticated users */}
+        <Route path="/reports" element={<Protected><EmployeeReports /></Protected>} />
 
         {/* Capacity — director+ */}
         <Route path="/capacity" element={<Protected minRole="director"><CapacityPlanning /></Protected>} />
 
         {/* Manager */}
-        <Route path="/add-employee"      element={<Protected><AddEmployee /></Protected>} />
-        <Route path="/manage-employees"  element={<Protected><ManageEmployees /></Protected>} />
-        <Route path="/approval-center"   element={<Protected minRole="manager"><ApprovalCenter /></Protected>} />
+        <Route path="/manage-employees" element={<Protected><ManageEmployees /></Protected>} />
+        <Route path="/approval-center"  element={<Protected minRole="manager"><ApprovalCenter /></Protected>} />
 
         {/* Admin — MD / EA / HR only (role level 3) */}
         <Route path="/admin/role-permissions" element={<Protected minRole="managing_director"><RolePermissions /></Protected>} />
         <Route path="/admin/org-chart"        element={<Protected minRole="managing_director"><OrgChart /></Protected>} />
 
-
-        {/* Legacy redirects */}
-        <Route path="/tasks"             element={<Navigate to="/special-tasks" replace />} />
-        <Route path="/date-approvals"    element={<Navigate to="/approval-center" replace />} />
-        <Route path="/performance-reviews" element={<Navigate to="/overview" replace />} />
+        {/* Legacy redirects — old bookmarks and deep links keep working */}
+        <Route path="/overview"            element={<Navigate to="/tasks" replace />} />
+        <Route path="/special-tasks"       element={<Navigate to="/tasks" replace />} />
+        <Route path="/team-jobs"           element={<Navigate to="/tasks" replace />} />
+        <Route path="/performance-reviews" element={<Navigate to="/tasks" replace />} />
+        <Route path="/add-employee"        element={<Navigate to="/manage-employees" replace />} />
+        <Route path="/date-approvals"      element={<Navigate to="/approval-center" replace />} />
 
         {/* Catch-all */}
-        <Route path="*" element={<Navigate to="/overview" replace />} />
+        <Route path="*" element={<Navigate to="/tasks" replace />} />
       </Route>
     </Routes>
   )
@@ -116,9 +127,11 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   )
 }

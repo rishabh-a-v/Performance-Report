@@ -9,6 +9,7 @@ import { useRecommendations } from '../hooks/useRecommendations';
 import { useSpecialTaskStore } from '@/store/specialTaskStore';
 import { UtilizationChart } from './UtilizationChart';
 import { SkillGapPie } from './SkillGapPie';
+import { NativeSelect } from '@/components/ui/Select';
 import { cn } from '@/lib/utils';
 
 interface CapacityDashboardProps {
@@ -122,7 +123,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
   return (
     <div className="space-y-6">
       {/* Filters Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-white border border-slate-100 p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-card border border-border p-4 shadow-sm">
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Filter Department</span>
           <div className="flex flex-wrap gap-1">
@@ -165,7 +166,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Total Capacity Card */}
-        <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+        <div className="relative overflow-hidden rounded-2xl bg-card border border-border p-5 shadow-sm">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Available Capacity</p>
@@ -179,7 +180,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
         </div>
 
         {/* Capacity Utilization Card */}
-        <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+        <div className="relative overflow-hidden rounded-2xl bg-card border border-border p-5 shadow-sm">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Avg Capacity Utilization</p>
@@ -203,7 +204,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
         </div>
 
         {/* Shortage Hours Card */}
-        <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+        <div className="relative overflow-hidden rounded-2xl bg-card border border-border p-5 shadow-sm">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Workload Shortage</p>
@@ -217,7 +218,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
         </div>
 
         {/* Overloaded Employees Card */}
-        <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+        <div className="relative overflow-hidden rounded-2xl bg-card border border-border p-5 shadow-sm">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Overloaded Staff</p>
@@ -244,7 +245,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
       {/* Main Charts & Visual Analytics Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Capacity vs Demand Line/Area Chart */}
-        <div className="lg:col-span-2 rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+        <div className="lg:col-span-2 rounded-2xl bg-card border border-border p-5 shadow-sm">
           <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Capacity vs Demand Forecast (7d)</h4>
           <div className="h-72">
             <UtilizationChart data={forecastData} />
@@ -252,7 +253,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
         </div>
 
         {/* Skill Gap Pie/Donut Chart */}
-        <div className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm flex flex-col">
+        <div className="rounded-2xl bg-card border border-border p-5 shadow-sm flex flex-col">
           <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-2">Team Skills Distribution</h4>
           <p className="text-[11px] text-slate-400 mb-4">Counts of certified employees in {branch}</p>
           <div className="h-56 flex-1">
@@ -266,7 +267,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
         {/* Left Column: Bottlenecks & Slack */}
         <div className="space-y-6">
           {/* Overloaded Bottlenecks Card */}
-          <div className="rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden">
+          <div className="rounded-2xl bg-card border border-border shadow-sm overflow-hidden">
             <div className="border-b border-slate-100 bg-rose-50/20 px-5 py-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <AlertTriangle size={15} className="text-rose-500" />
@@ -301,7 +302,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
           </div>
 
           {/* Underutilized Slack Card */}
-          <div className="rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden">
+          <div className="rounded-2xl bg-card border border-border shadow-sm overflow-hidden">
             <div className="border-b border-slate-100 bg-emerald-50/20 px-5 py-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircle size={15} className="text-emerald-500" />
@@ -337,7 +338,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
         </div>
 
         {/* Right Column: Task Assignment Assistant */}
-        <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-5 flex flex-col justify-between">
+        <div className="rounded-2xl bg-card border border-border shadow-sm p-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
@@ -353,10 +354,10 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
             {/* Task selector dropdown */}
             <div className="mb-4">
               <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Select Active Task</label>
-              <select
+              <NativeSelect
                 value={selectedTaskId || ''}
                 onChange={(e) => setSelectedTaskId(e.target.value || null)}
-                className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-xs text-slate-700 focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                className="w-full rounded-lg border border-border bg-card py-2 pl-3 pr-8 text-xs text-foreground focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
               >
                 <option value="">-- Choose a task --</option>
                 {/* Dynamically list active tasks that aren't completed */}
@@ -370,7 +371,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
                     {task.task_name} ({task.priority})
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
 
             {selectedTaskId && (
@@ -405,7 +406,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
                           e.currentTarget.value = '';
                         }
                       }}
-                      className="flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                      className="flex-1 rounded border border-border bg-card px-2 py-1 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-blue-300"
                     />
                   </div>
                 </div>
@@ -473,7 +474,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
                                   .filter(c => c.id !== recommendation.targetEmployee && c.matchScore > 0)
                                   .slice(0, 3)
                                   .map(c => (
-                                    <div key={c.id} className="rounded-lg border border-slate-100 bg-white p-2 flex items-center justify-between hover:bg-slate-50/40">
+                                    <div key={c.id} className="rounded-lg border border-border bg-card p-2 flex items-center justify-between hover:bg-slate-50/40">
                                       <div className="min-w-0">
                                         <p className="text-[11px] font-bold text-slate-700 truncate">{c.name}</p>
                                         <p className="text-[9px] text-slate-400">Match score: {c.matchScore} · Util: {c.utilizationPercent}%</p>
@@ -509,7 +510,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
       </div>
 
       {/* Workforce Profiling Editor & Skills Admin Table */}
-      <div className="rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden">
+      <div className="rounded-2xl bg-card border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h4 className="text-sm font-bold uppercase tracking-wider text-slate-700">Workforce Profiling & Capacity Editor</h4>
@@ -591,7 +592,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
       {/* Edit Capacity Settings Modal Drawer */}
       {editingEmpId && selectedEmployee && (
         <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/40 backdrop-blur-sm transition-opacity">
-          <div className="h-full w-full max-w-md bg-white p-6 shadow-2xl flex flex-col justify-between overflow-y-auto animate-slide-in">
+          <div className="h-full w-full max-w-md bg-card p-6 shadow-2xl flex flex-col justify-between overflow-y-auto animate-slide-in">
             <div className="space-y-6">
               {/* Drawer Header */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -667,17 +668,17 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
                     onChange={(e) => setNewSkillName(e.target.value)}
                     className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
-                  <select
-                    value={newSkillProficiency}
+                  <NativeSelect
+                    value={String(newSkillProficiency)}
                     onChange={(e) => setNewSkillProficiency(Number(e.target.value))}
-                    className="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-20 rounded-lg border border-border bg-card px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
                     <option value="1">L1</option>
                     <option value="2">L2</option>
                     <option value="3">L3</option>
                     <option value="4">L4</option>
                     <option value="5">L5</option>
-                  </select>
+                  </NativeSelect>
                   <button
                     onClick={handleAddSkill}
                     className="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 text-xs font-semibold shadow-sm transition-all"
@@ -710,7 +711,7 @@ export function CapacityDashboard({ branch }: CapacityDashboardProps) {
             <div className="flex gap-3 pt-6 border-t border-slate-100 mt-8">
               <button
                 onClick={() => setEditingEmpId(null)}
-                className="flex-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 py-2 text-xs font-semibold shadow-sm transition-all"
+                className="flex-1 rounded-lg border border-border bg-card hover:bg-muted text-foreground py-2 text-xs font-semibold shadow-sm transition-all"
               >
                 Cancel
               </button>
