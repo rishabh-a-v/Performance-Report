@@ -21,8 +21,28 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { Profile } from '@/types/database'
 import { X, Check, Building2, Briefcase, GitBranch, ShieldCheck } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
+import { NativeSelect } from '@/components/ui/Select'
 
 const ADMIN_ROLES = ['managing_director', 'executive_assistant', 'hr']
+
+// The `reporting` table (not profiles.manager_id) is what RBAC visibility
+// reads from — profiles.manager_id is just a cache kept in sync by a DB
+// trigger whenever `reporting` changes. Every reassignment must go through
+// this table or the employee silently vanishes from their new manager's
+// Employees / Tasks / Job Directions team views.
+async function upsertReportingRow(
+  employeeId: string, managerId: string | null, roleValue: string, departmentId: string, branch: string,
+) {
+  await supabase.from('reporting').delete().eq('employee_id', employeeId)
+  const { error } = await supabase.from('reporting').insert({
+    employee_id: employeeId,
+    department: departmentId || '',
+    role: ROLE_LABEL[roleValue] ?? 'Executive',
+    branch: branch || '',
+    reporting_to_id: managerId,
+  })
+  return error
+}
 
 // Would setting employeeId's manager to newManagerId create a reporting cycle
 // (i.e. is newManagerId currently employeeId themselves, or one of their own
@@ -64,7 +84,7 @@ function EmployeeNode({ data }: NodeProps) {
 
   return (
     <div
-      className="rounded-xl shadow-md border-2 w-44 cursor-grab active:cursor-grabbing select-none"
+      className="rounded-xl shadow-card border-2 w-44 cursor-grab active:cursor-grabbing select-none"
       style={{ background: colors.bg, borderColor: colors.border }}
     >
       <Handle type="target" position={Position.Top}    style={{ opacity: 0 }} />
@@ -184,58 +204,58 @@ function EditPanel({
   )
 
   return (
-    <div className="absolute right-4 top-4 z-50 w-72 rounded-2xl border border-slate-200 bg-white shadow-2xl">
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+    <div className="absolute right-4 top-4 z-50 w-72 rounded-xl border border-border bg-card shadow-card">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
-          <Briefcase size={14} className="text-indigo-500" />
-          <span className="text-sm font-bold text-slate-800">{s.profile.full_name}</span>
+          <Briefcase size={14} className="text-primary" />
+          <span className="text-sm font-bold text-foreground">{s.profile.full_name}</span>
         </div>
-        <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
           <X size={15} />
         </button>
       </div>
 
       <div className="p-4 space-y-3">
         <Field label="Role">
-          <select className={SEL} value={s.role} onChange={(e) => setS({ ...s, role: e.target.value })}>
+          <NativeSelect className={SEL} value={s.role} onChange={(e) => setS({ ...s, role: e.target.value })}>
             {Object.entries(ROLE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
+          </NativeSelect>
         </Field>
 
         <Field label="Reports to">
-          <select className={SEL} value={s.managerId} onChange={(e) => setS({ ...s, managerId: e.target.value })}>
+          <NativeSelect className={SEL} value={s.managerId} onChange={(e) => setS({ ...s, managerId: e.target.value })}>
             <option value="">— None —</option>
             {managers.map((m) => (
               <option key={m.id} value={m.id}>{m.full_name} ({ROLE_LABEL[m.role] ?? m.role})</option>
             ))}
-          </select>
+          </NativeSelect>
         </Field>
 
         <Field label="Department">
-          <select className={SEL} value={s.departmentId} onChange={(e) => setS({ ...s, departmentId: e.target.value })}>
+          <NativeSelect className={SEL} value={s.departmentId} onChange={(e) => setS({ ...s, departmentId: e.target.value })}>
             <option value="">— None —</option>
             {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
+          </NativeSelect>
         </Field>
 
         <Field label="Branch">
-          <select className={SEL} value={s.branch} onChange={(e) => setS({ ...s, branch: e.target.value })}>
+          <NativeSelect className={SEL} value={s.branch} onChange={(e) => setS({ ...s, branch: e.target.value })}>
             <option value="">— None —</option>
             {branches.map((b) => <option key={b.id} value={b.code}>{b.name}</option>)}
-          </select>
+          </NativeSelect>
         </Field>
       </div>
 
-      <div className="flex gap-2 border-t border-slate-100 px-4 py-3">
+      <div className="flex gap-2 border-t border-border px-4 py-3">
         <button
           onClick={onClose}
-          className="flex-1 rounded-lg border border-slate-200 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+          className="flex-1 rounded-lg border border-border py-2 text-xs font-semibold text-foreground hover:bg-muted"
         >
           Cancel
         </button>
         <button
           onClick={() => onSave(s)}
-          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
         >
           <Check size={12} /> Save
         </button>
@@ -244,11 +264,11 @@ function EditPanel({
   )
 }
 
-const SEL = 'w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 focus:border-indigo-300 focus:outline-none'
+const SEL = 'w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:border-primary/40 focus:outline-none'
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</label>
+      <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</label>
       {children}
     </div>
   )
@@ -333,10 +353,10 @@ export function OrgChart() {
       return
     }
     setSaving(true)
-    const { error } = await supabase
-      .from('profiles')
-      .update({ manager_id: dropConfirm.newManager.id })
-      .eq('id', dropConfirm.employee.id)
+    const { employee } = dropConfirm
+    const error = await upsertReportingRow(
+      employee.id, dropConfirm.newManager.id, employee.role, employee.department_id ?? '', employee.branch ?? '',
+    )
     setSaving(false)
     setDropConfirm(null)
     if (error) { showToast('Failed to reassign'); return }
@@ -351,14 +371,14 @@ export function OrgChart() {
       return
     }
     setSaving(true)
-    const { error } = await supabase.from('profiles').update({
+    const { error: pErr } = await supabase.from('profiles').update({
       role: s.role,
-      manager_id: s.managerId || null,
       department_id: s.departmentId || null,
       branch: s.branch || null,
     }).eq('id', s.profile.id)
+    const rErr = pErr ? null : await upsertReportingRow(s.profile.id, s.managerId || null, s.role, s.departmentId, s.branch)
     setSaving(false)
-    if (error) { showToast('Failed to save changes'); return }
+    if (pErr || rErr) { showToast('Failed to save changes'); return }
     showToast('Changes saved')
     setEditState(null)
     fetchAll()
@@ -369,9 +389,9 @@ export function OrgChart() {
   if (!ADMIN_ROLES.includes(role ?? '')) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center gap-3">
-        <ShieldCheck size={36} className="text-slate-300" />
-        <p className="text-slate-500 font-medium">Access restricted</p>
-        <p className="text-sm text-slate-400">Only MD, EA, and HR can view the org chart.</p>
+        <ShieldCheck size={36} className="text-muted-foreground/50" />
+        <p className="text-muted-foreground font-medium">Access restricted</p>
+        <p className="text-sm text-muted-foreground">Only MD, EA, and HR can view the org chart.</p>
       </div>
     )
   }
@@ -379,14 +399,14 @@ export function OrgChart() {
   return (
     <div className="relative flex h-[calc(100vh-5rem)] flex-col">
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">Organisation Chart</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <h1 className="text-lg font-semibold text-foreground">Org Chart</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
             Click a card to edit role / department / reporting line. Drag a card onto a manager to reassign.
           </p>
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-slate-500">
+        <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-wrap">
           {Object.entries(ROLE_COLOR).map(([role, c]) => (
             <div key={role} className="flex items-center gap-1">
               <span className="inline-block h-2.5 w-2.5 rounded-full border" style={{ background: c.bg, borderColor: c.border }} />
@@ -397,7 +417,7 @@ export function OrgChart() {
       </div>
 
       {/* Flow canvas */}
-      <div className="flex-1 rounded-2xl border border-slate-200 bg-white overflow-hidden relative">
+      <div className="flex-1 rounded-xl border border-border bg-card overflow-hidden relative">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -420,7 +440,7 @@ export function OrgChart() {
               return p ? (ROLE_COLOR[p.role]?.bg ?? '#e2e8f0') : '#e2e8f0'
             }}
             maskColor="rgba(248,250,252,0.7)"
-            className="!bottom-4 !right-4 !border-slate-200 !rounded-xl"
+            className="!bottom-4 !right-4 !border-border !rounded-xl"
           />
         </ReactFlow>
 
@@ -438,24 +458,24 @@ export function OrgChart() {
 
         {/* Drop-reassign confirm */}
         {dropConfirm && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
-            <div className="w-80 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
-              <p className="text-sm font-bold text-slate-800">Reassign reporting line?</p>
-              <p className="mt-1.5 text-xs text-slate-500">
-                Make <span className="font-semibold text-slate-700">{dropConfirm.employee.full_name}</span> report to{' '}
-                <span className="font-semibold text-slate-700">{dropConfirm.newManager.full_name}</span>?
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4">
+            <div className="w-80 rounded-xl border border-border bg-card p-6 shadow-card">
+              <p className="text-sm font-bold text-foreground">Reassign reporting line?</p>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Make <span className="font-semibold text-foreground">{dropConfirm.employee.full_name}</span> report to{' '}
+                <span className="font-semibold text-foreground">{dropConfirm.newManager.full_name}</span>?
               </p>
               <div className="mt-4 flex gap-2">
                 <button
                   onClick={() => setDropConfirm(null)}
-                  className="flex-1 rounded-lg border border-slate-200 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  className="flex-1 rounded-lg border border-border py-2 text-xs font-semibold text-foreground hover:bg-muted"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDrop}
                   disabled={saving}
-                  className="flex-1 rounded-lg bg-indigo-600 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="flex-1 rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
                   {saving ? 'Saving…' : 'Confirm'}
                 </button>
@@ -467,7 +487,7 @@ export function OrgChart() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-slate-800 px-4 py-2.5 text-xs font-semibold text-white shadow-xl">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-foreground px-4 py-2.5 text-xs font-semibold text-background shadow-card">
           {toast}
         </div>
       )}
