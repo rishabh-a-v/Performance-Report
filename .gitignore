@@ -38,3 +38,18 @@ lerna-debug.log*
 
 # TypeScript cache
 *.tsbuildinfo
+
+# Capacitor / Android
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+android/.idea/
+*.apk
+*.aab
+android/app/src/main/assets/public/
+
+# Release signing — never commit the keystore or its credentials
+android/keystore/
+android/keystore.properties

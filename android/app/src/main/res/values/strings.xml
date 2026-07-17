@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Transworld Task Tracker</string>
+    <string name="title_activity_main">Transworld Task Tracker</string>
+    <string name="package_name">com.transworld.performancereport</string>
+    <string name="custom_url_scheme">com.transworld.performancereport</string>
+</resources>

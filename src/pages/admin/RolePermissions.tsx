@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { usePermissionStore } from '@/store/permissionStore'
 import { ShieldCheck, RefreshCw, Info } from 'lucide-react'
+import { PageHeader } from '@/components/shared/PageHeader'
 import type { RolePermission } from '@/types/database'
 import { cn } from '@/lib/utils'
 
@@ -76,8 +77,8 @@ function Toggle({
       disabled={disabled}
       onClick={() => onChange(!value)}
       className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1',
-        value ? 'bg-indigo-600' : 'bg-slate-200',
+        'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1',
+        value ? 'bg-primary' : 'bg-muted',
         disabled && 'cursor-not-allowed opacity-50'
       )}
     >
@@ -104,9 +105,9 @@ export function RolePermissions() {
   if (!ADMIN_ROLES.includes(role ?? '')) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center gap-3">
-        <ShieldCheck size={36} className="text-slate-300" />
-        <p className="text-slate-500 font-medium">Access restricted</p>
-        <p className="text-sm text-slate-400">Only MD, EA, and HR can view this page.</p>
+        <ShieldCheck size={36} className="text-muted-foreground/50" />
+        <p className="text-muted-foreground font-medium">Access restricted</p>
+        <p className="text-sm text-muted-foreground">Only MD, EA, and HR can view this page.</p>
       </div>
     )
   }
@@ -153,24 +154,19 @@ export function RolePermissions() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <ShieldCheck size={22} className="text-indigo-600" />
-            Role Permissions
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Toggle access rules for each role. Changes take effect immediately for all users with that role.
-          </p>
-        </div>
-        <button
-          onClick={fetchAllPermissions}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
-        >
-          <RefreshCw size={14} />
-          Refresh
-        </button>
-      </div>
+      <PageHeader
+        title="Role Permissions"
+        description="Toggle access rules for each role. Changes take effect immediately for all users with that role."
+        actions={
+          <button
+            onClick={fetchAllPermissions}
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+          >
+            <RefreshCw size={14} />
+            Refresh
+          </button>
+        }
+      />
 
       {/* Legend */}
       <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
@@ -182,10 +178,10 @@ export function RolePermissions() {
       </div>
 
       {/* Permissions table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <tr className="border-b border-border bg-muted text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <th className="px-5 py-3.5 text-left">Role</th>
               {COLUMNS.map((col) => (
                 <th key={col.key} className="px-4 py-3.5 text-center">
@@ -194,26 +190,26 @@ export function RolePermissions() {
                     <button
                       onMouseEnter={() => setTooltip(col.key)}
                       onMouseLeave={() => setTooltip(null)}
-                      className="relative text-slate-300 hover:text-slate-500 transition-colors"
+                      className="relative text-muted-foreground/60 hover:text-muted-foreground transition-colors"
                     >
                       <Info size={12} />
                       {tooltip === col.key && (
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 rounded-lg bg-slate-800 px-3 py-2 text-[11px] font-normal normal-case tracking-normal text-white shadow-lg text-left z-20">
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 rounded-lg bg-foreground px-3 py-2 text-[11px] font-normal normal-case tracking-normal text-background shadow-lg text-left z-20">
                           {col.hint}
-                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-foreground" />
                         </div>
                       )}
                     </button>
                   </div>
                 </th>
               ))}
-              <th className="px-5 py-3.5 text-left text-slate-400">Last Updated</th>
+              <th className="px-5 py-3.5 text-left text-muted-foreground">Last Updated</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-border">
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={COLUMNS.length + 2} className="px-5 py-10 text-center text-slate-400">
+                <td colSpan={COLUMNS.length + 2} className="px-5 py-10 text-center text-muted-foreground">
                   Loading permissions…
                 </td>
               </tr>
@@ -221,11 +217,11 @@ export function RolePermissions() {
               sorted.map((perm) => {
                 const isAdminRole = ADMIN_ROLES.includes(perm.role)
                 return (
-                  <tr key={perm.role} className={cn('transition-colors hover:bg-slate-50/60', isAdminRole && 'bg-indigo-50/30')}>
+                  <tr key={perm.role} className={cn('transition-colors hover:bg-muted/60', isAdminRole && 'bg-primary/5')}>
                     <td className="px-5 py-4">
                       <div>
-                        <p className="font-semibold text-slate-800">{perm.label}</p>
-                        <p className="text-xs text-slate-400 font-mono mt-0.5">{perm.role}</p>
+                        <p className="font-semibold text-foreground">{perm.label}</p>
+                        <p className="text-xs text-muted-foreground font-mono mt-0.5">{perm.role}</p>
                       </div>
                     </td>
                     {COLUMNS.map((col) => {
@@ -241,12 +237,12 @@ export function RolePermissions() {
                             />
                           </div>
                           {isSaving && (
-                            <p className="text-[10px] text-indigo-500 mt-1 animate-pulse">Saving…</p>
+                            <p className="text-[10px] text-primary mt-1 animate-pulse">Saving…</p>
                           )}
                         </td>
                       )
                     })}
-                    <td className="px-5 py-4 text-xs text-slate-400 whitespace-nowrap">
+                    <td className="px-5 py-4 text-xs text-muted-foreground whitespace-nowrap">
                       {perm.updated_at
                         ? new Date(perm.updated_at).toLocaleDateString('en-IN', {
                             day: '2-digit', month: 'short', year: 'numeric',
@@ -261,8 +257,8 @@ export function RolePermissions() {
         </table>
       </div>
 
-      <p className="text-xs text-slate-400">
-        <strong className="text-slate-500">Note:</strong> The Executive row is read-only in practice — executives
+      <p className="text-xs text-muted-foreground">
+        <strong className="text-muted-foreground">Note:</strong> The Executive row is read-only in practice — executives
         only see their own data via the "My" tabs and never access team views.
       </p>
     </div>
